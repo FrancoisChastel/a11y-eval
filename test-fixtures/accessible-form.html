@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Request time off</title>
+  <style>
+    :root { --accent: #2a4bd7; --error: #b3261e; --text: #1a1a1a; }
+    body { font-family: system-ui, sans-serif; color: var(--text); margin: 0; padding: 1rem; max-width: 40rem; }
+    label { display: block; font-weight: 600; margin: 1rem 0 0.25rem; }
+    input, fieldset { max-width: 100%; }
+    input { padding: 0.5rem; font-size: 1rem; border: 1px solid #767676; border-radius: 4px; }
+    .helper { margin: 0.25rem 0 0; font-size: 0.875rem; color: #444; }
+    .error-text { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--error); }
+    button { font-size: 1rem; padding: 0.75rem 1.25rem; border-radius: 4px; border: 1px solid transparent; min-width: 44px; min-height: 44px; }
+    .primary { background: var(--accent); color: #ffffff; }
+    .secondary { background: #ffffff; color: var(--accent); border-color: var(--accent); }
+    .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; flex-wrap: wrap; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    fieldset { border: 1px solid #ccc; border-radius: 4px; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Breadcrumb"><a href="/hr">Human Resources</a> › <a href="/hr/time-off">Time off</a> › New request</nav>
+  <main>
+    <h1>Request time off</h1>
+
+    <form>
+      <label for="employee">Employee</label>
+      <input id="employee" name="employee" value="François Chastel" readonly />
+      <p class="helper" id="employee-help">Prefilled from your account.</p>
+
+      <label for="start-date">Start date</label>
+      <input id="start-date" name="start" type="date" required aria-describedby="start-error" aria-invalid="true" />
+      <p id="start-error" class="error-text" role="alert">Enter a start date that is today or later.</p>
+
+      <label for="end-date">End date</label>
+      <input id="end-date" name="end" type="date" required />
+
+      <fieldset>
+        <legend>Notify your manager now?</legend>
+        <p class="helper">Notifying locks this request from further edits. This cannot be undone.</p>
+        <label for="notify-yes"><input id="notify-yes" type="radio" name="notify" value="yes" /> Yes, notify and lock</label>
+        <label for="notify-no"><input id="notify-no" type="radio" name="notify" value="no" checked /> No, keep editable</label>
+      </fieldset>
+
+      <div class="actions">
+        <button type="submit" class="primary">Submit request</button>
+        <button type="button" class="secondary">Save draft</button>
+        <a href="/hr/time-off">Cancel and go back</a>
+      </div>
+      <p role="status"></p>
+    </form>
+  </main>
+</body>
+</html>

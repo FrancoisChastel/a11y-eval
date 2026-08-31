@@ -1,0 +1,38 @@
+<!-- Test fixture: intentionally flawed "Create PTO Request" screen -->
+<div class="page">
+  <div class="nav">HRMS &gt; TBL_PTO_REQ &gt; New</div>
+
+  <form>
+    <input placeholder="EMP_ID" />
+    <input placeholder="Start" style="border-color: red" />
+    <span class="err">Invalid input.</span>
+    <input placeholder="End" />
+
+    <select>
+      <option>Yes</option>
+      <option>No</option>
+    </select>
+    <span class="tooltip" title="Selecting Yes will notify your manager and lock the request from further edits. This cannot be undone.">?</span>
+
+    <div class="btn" onclick="submitForm()">OK</div>
+    <div class="btn btn-danger" onclick="deleteAllDrafts()">Clear</div>
+  </form>
+</div>
+
+<style>
+  * { outline: none; }
+  .err { color: red; font-size: 9px; }
+  .btn { background: #7b7bff; color: #9b9bff; padding: 2px; }
+</style>
+
+<script>
+  function submitForm() {
+    fetch('/api/pto', { method: 'POST' });
+    /* no success/failure feedback, form clears on error */
+    document.querySelector('form').reset();
+  }
+  function deleteAllDrafts() {
+    /* deletes immediately, no confirmation, no undo */
+    fetch('/api/pto/drafts', { method: 'DELETE' });
+  }
+</script>
