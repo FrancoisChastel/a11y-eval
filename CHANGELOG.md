@@ -3,6 +3,14 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.3.1] - 2026-08-31
+
+### Added
+
+- **CI workflow** (GitHub Actions): typecheck, unit tests, and the four fixture integration checks (accessible control passes, flawed page exits 1, crawl discovers 3 pages, repo-mode static scan finds the planted violations) on every push and PR.
+- `CONTRIBUTING.md` (setup, test/fixture workflow, design rules, release process) and issue templates.
+- README badges, contributing/license/acknowledgments sections; `homepage` and `bugs` package metadata.
+
 ## [0.3.0] - 2026-08-31
 
 ### Added

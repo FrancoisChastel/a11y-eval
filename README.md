@@ -1,5 +1,10 @@
 # a11y-eval
 
+[![CI](https://github.com/FrancoisChastel/a11y-eval/actions/workflows/ci.yml/badge.svg)](https://github.com/FrancoisChastel/a11y-eval/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/FrancoisChastel/a11y-eval)](https://github.com/FrancoisChastel/a11y-eval/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Node](https://img.shields.io/badge/node-%E2%89%A523.6-brightgreen)
+
 WCAG 2.2 AA evaluation tool built entirely on open-source components. Point it at a **repo** and/or a **running app**: it detects the framework, statically scans the source, starts the dev server, **crawls** the pages, runs runtime accessibility engines on each, and merges everything into one scored, gateable report. Designed as the **evaluation function** for accessibility agents: deterministic input → structured JSON output.
 
 ## Quick start
@@ -129,3 +134,11 @@ node src/cli.ts --repo test-fixtures/mini-app --no-crawl --url test-fixtures/sit
 - The reflow check flags overflow, not the SC's exemptions (data tables, maps) — treat `horizontal-overflow-320` as review-required.
 - The crawler follows links, so pages reachable only through form submissions, auth, or JS-only navigation need explicit `--url` seeds (or a Playwright storage state / dev auth bypass).
 - SPA client-side route changes without `<a href>` links are not discovered — seed those routes explicitly.
+
+## Contributing
+
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the test/fixture workflow, and the design rules (severity-gated verdicts, no compliance claims, the report JSON as a stable contract). Bug reports with a minimal repro HTML page are gold: they become permanent fixtures.
+
+## License & acknowledgments
+
+[MIT](LICENSE). Standing on excellent open-source shoulders: [axe-core](https://github.com/dequelabs/axe-core) (Deque), [Playwright](https://github.com/microsoft/playwright) (Microsoft), [ESLint](https://eslint.org) and [eslint-plugin-jsx-a11y](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y). None of these projects endorse this tool; all the accessibility expertise encoded in the automated rules is theirs.

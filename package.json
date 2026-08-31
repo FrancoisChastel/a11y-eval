@@ -1,6 +1,6 @@
 {
   "name": "a11y-eval",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "WCAG 2.2 AA evaluation tool for repos and running apps — framework detection, static source scan, dev-server start, multi-page crawl, axe-core + custom Playwright checks, with a stable JSON contract for agent consumption",
   "type": "module",
   "bin": {
@@ -21,7 +21,16 @@
   "engines": {
     "node": ">=23.6.0"
   },
-  "keywords": ["accessibility", "a11y", "wcag", "wcag22", "axe-core", "playwright", "eslint", "crawler"],
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "wcag22",
+    "axe-core",
+    "playwright",
+    "eslint",
+    "crawler"
+  ],
   "dependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@typescript-eslint/parser": "^8.69.0",
@@ -34,5 +43,9 @@
     "@vitest/coverage-v8": "^4.1.11",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
+  },
+  "homepage": "https://github.com/FrancoisChastel/a11y-eval#readme",
+  "bugs": {
+    "url": "https://github.com/FrancoisChastel/a11y-eval/issues"
   }
 }

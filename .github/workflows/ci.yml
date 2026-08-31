@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Install Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Integration — accessible control page must pass
+        run: node src/cli.ts --url test-fixtures/accessible-form.html --out /tmp/r-accessible
+
+      - name: Integration — flawed page must fail with exit 1
+        run: |
+          if node src/cli.ts --url test-fixtures/flawed-form.html --out /tmp/r-flawed; then
+            echo "Expected exit code 1 for the flawed fixture" && exit 1
+          fi
+
+      - name: Integration — crawl discovers all 3 site pages
+        run: |
+          node src/cli.ts --url test-fixtures/site/index.html --crawl --out /tmp/r-crawl || true
+          node -e "
+            const r = require('/tmp/r-crawl/report.json');
+            if (r.pages.length !== 3) { console.error('expected 3 pages, got', r.pages.length); process.exit(1); }
+            if (r.verdict !== 'fail') { console.error('expected fail verdict, got', r.verdict); process.exit(1); }
+          "
+
+      - name: Integration — repo mode bundled static scan finds the planted violations
+        run: |
+          node src/cli.ts --repo test-fixtures/mini-app --no-crawl --url test-fixtures/site/page2.html --out /tmp/r-static
+          node -e "
+            const r = require('/tmp/r-static/report.json');
+            const n = r.findings.filter(f => f.engine === 'static').length;
+            if (n !== 5) { console.error('expected 5 static findings, got', n); process.exit(1); }
+          "
