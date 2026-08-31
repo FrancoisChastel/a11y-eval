@@ -9,15 +9,11 @@ WCAG 2.2 AA evaluation tool built entirely on open-source components. Point it a
 
 ## Demo
 
-**60-second explainer** (Remotion-rendered walkthrough of the whole pipeline — click to watch):
+**60-second explainer** — the whole pipeline in one pass (Remotion-rendered from verbatim CLI output; [HD video](https://github.com/FrancoisChastel/a11y-eval/releases/download/v0.8.0/a11y-eval-explainer.mp4)):
 
-[![Watch the a11y-eval explainer video: one command evaluates a repo, artifacts, suspects vs violations, the review UI, mitigation work orders, and the baseline fix loop](docs/explainer-poster.png)](https://github.com/FrancoisChastel/a11y-eval/releases/download/v0.8.0/a11y-eval-explainer.mp4)
+![Animated explainer: one command evaluates a repo (detect, static scan, dev-server start, crawl) into a scored report; four artifacts per run; violations gate CI while machine-flagged suspects pre-fill the review UI; mitigations are an agent-executable work order; fixes are verified with a baseline re-run animating the score to 100](docs/demo-explainer.gif)
 
-Evaluate a site — crawl, engines, verdict, remediation plan:
-
-![CLI demo: crawling a site, findings summary, remediation plan, and the generated review UI](docs/demo-cli.gif)
-
-Then complete the manual half in the generated review UI — signal-suggested N/A with auto-evidence, per-criterion procedures, evidence capture, live progress:
+Then complete the manual half in the generated review UI — machine-flagged suspects to confirm, signal-suggested N/A with auto-evidence, per-criterion procedures, live progress:
 
 ![Review UI demo: applying a signal-suggested Not applicable with auto-generated evidence, failing 2.4.3 Focus Order with typed evidence, and the progress footer](docs/demo-review-ui.gif)
 
@@ -201,7 +197,7 @@ node src/cli.ts --repo test-fixtures/mini-app --no-crawl --url test-fixtures/sit
 
 The unit-test count grows with the suite — `pnpm test` prints the current number (45 as of v0.4.0).
 
-Regenerating the README demos after UI/CLI changes: `vhs docs/demo-cli.tape` for the terminal GIF; `node docs/record-review-demo.mjs <review.html> out.webm` + an ffmpeg palette pass (fps 7, 820px, 64 colors) for the review-UI GIF; and for the explainer video, `cd video && pnpm install && pnpm render` (Remotion — scenes in `video/src/`, terminal transcripts kept verbatim from real runs in `video/src/content.ts`), then `pnpm poster` and upload the mp4 as a release asset.
+Regenerating the README demos after UI/CLI changes: the explainer via `cd video && pnpm install && pnpm render` (Remotion — scenes in `video/src/`, terminal transcripts kept verbatim from real runs in `video/src/content.ts`), then an ffmpeg palette pass to GIF (`fps=10,scale=900` + 128-color palettegen/paletteuse → `docs/demo-explainer.gif`) and upload the mp4 as a release asset for the HD link; the review-UI GIF via `node docs/record-review-demo.mjs <review.html> out.webm` + ffmpeg (fps 7, 820px, 64 colors).
 
 ## Known limitations
 
