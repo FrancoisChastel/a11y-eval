@@ -27,7 +27,7 @@ const report: Report = {
   totals: { critical: 0, serious: 2, moderate: 1, minor: 0 },
   score: 77,
   verdict: 'fail',
-  manualChecklist: [{ sc: '2.4.3', name: 'Focus Order', why: 'Order meaningfulness needs judgment.' }],
+  manualChecklist: [{ sc: '2.4.3', name: 'Focus Order', why: 'Order meaningfulness needs judgment.', how: 'Tab through and compare to reading order.', signal: null }],
   coverageNote: 'coverage note',
 }
 

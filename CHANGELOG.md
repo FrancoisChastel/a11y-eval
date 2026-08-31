@@ -3,6 +3,22 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.4.0] - 2026-08-31
+
+### Added
+
+- **Human review UI** (`review.html`, written by every evaluation): self-contained page for completing the manual half of the evaluation — all 16 criteria with per-criterion procedures, status/evidence/affected-pages/severity capture, optional reviewer feedback (assistive tech, browser, method). Static mode persists to localStorage with export/import; **served mode** (`a11y-eval review`) adds autosave, Playwright-powered element evidence screenshots, and one-click finalize-merge. Loopback-only server; screenshot endpoint restricted to evaluated URLs.
+- **Content signals** (`pages[].signals`): runtime detection of media, form controls, drag affordances, hover-revealed content, foreign-language parts, and iframes. The review UI suggests justified auto-N/A when a criterion's signal is absent and warns when N/A contradicts detected signals.
+- **`merge` subcommand**: combines a manual review into a final report with a merged `overall` verdict (`fail` / `issues` / `no-known-violations`), human findings entering scoring, and undocumented dispositions surfaced. Exit 1 on overall fail.
+- **Remediation catalog + `remediationPlan`**: deterministic fix guidance (steps, good/bad examples, effort, pitfalls) for custom and high-frequency rules; findings grouped by root cause, ordered by impact then reach, rendered in report.md and the review UI.
+- **`--baseline` diff**: classifies findings as new / persisting / fixed across runs (origin-insensitive fingerprints), lists fixed findings, and carries a baseline's manual review forward as review-UI prefill.
+- Skill updated with Phase 5 (mitigation recommendations), content-signal usage, baseline loops, and human-review merge guidance.
+- CI: dogfood gate (review.html must pass the tool's own evaluation), merge and baseline integration checks.
+
+### Changed
+
+- `Engine` type now includes `agent` and `human`; `ManualCheckItem` gains `how` (review procedure) and `signal` (applicability gate).
+
 ## [0.3.1] - 2026-08-31
 
 ### Added

@@ -1,42 +1,53 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { evaluate } from './evaluate.ts'
+import { mergeManualReview } from './merge.ts'
 import { detectRepo } from './repo/detect.ts'
 import { startServer } from './repo/server.ts'
 import { runStaticScan } from './repo/staticScan.ts'
 import { renderMarkdown } from './report.ts'
-import type { Finding, ReportMeta } from './types.ts'
+import { renderReviewHtml } from './review/render.ts'
+import { startReviewServer } from './review/server.ts'
+import type { Finding, ManualReview, Report, ReportMeta } from './types.ts'
 
 const USAGE = `a11y-eval — WCAG 2.2 AA evaluation for a running app and/or a source repo
 
 Usage:
   node src/cli.ts --url <url> [--crawl]                     # evaluate running pages
   node src/cli.ts --repo <dir> [--url <url>]                # repo mode: static scan + start + crawl
+  node src/cli.ts review [--report <dir>] [--port <n>]      # serve the manual-review UI
+  node src/cli.ts merge --report <dir> --manual <file>      # merge a manual review into a final report
 
-Repo mode (--repo):
-  Detects the framework and package manager, runs a static a11y scan on the source
-  (the repo's own ESLint if configured, bundled jsx-a11y otherwise), starts the dev
-  server (detected script, or --start-cmd), crawls from the base URL, and merges
-  everything into one report. If --url is given, no server is started.
-
-Options:
+Evaluate options:
   --url <url>            Seed page. http(s)://, file://, or local HTML path. Repeatable.
   --repo <dir>           Source repo to scan (enables repo mode).
   --start-cmd <cmd>      Command to start the app (default in repo mode: detected dev script).
   --port <n>             Port the app serves on (default: framework default).
-  --crawl                Discover same-scope pages from the seeds (default ON in repo mode).
-  --no-crawl             Disable crawling in repo mode.
+  --crawl / --no-crawl   Discover same-scope pages (default ON in repo mode).
   --max-pages <n>        Crawl cap (default 15).
   --max-depth <n>        Crawl depth cap (default 3).
   --no-static            Skip the static source scan in repo mode.
   --static-report <path> Merge an existing ESLint JSON report instead of scanning.
-  --out <dir>            Output directory (default: a11y-report). Writes report.json + report.md.
+  --baseline <path>      Previous report.json to diff against (new/fixed/persisting) and
+                         to carry its manual review forward into the review UI.
+  --out <dir>            Output directory (default: a11y-report).
+                         Writes report.json + report.md + review.html.
   --json                 Print the JSON report to stdout.
   --help                 Show this help.
 
-Exit codes: 0 = pass or pass-with-issues, 1 = fail (critical/serious violations), 2 = usage/runtime error.`
+Review options (subcommand "review"):
+  --report <dir>         Directory containing report.json (default: a11y-report).
+  --port <n>             UI port (default: 4936). Binds to 127.0.0.1 only.
+
+Merge options (subcommand "merge"):
+  --report <dir>         Directory containing report.json (default: a11y-report).
+  --manual <path>        manual-review.json exported from the review UI.
+  --out <dir>            Output directory (default: same as --report).
+
+Exit codes: 0 = pass or pass-with-issues, 1 = fail (critical/serious violations, or a
+manual fail after merge), 2 = usage/runtime error.`
 
 interface CliArgs {
   urls: string[]
@@ -48,12 +59,15 @@ interface CliArgs {
   maxDepth?: number
   noStatic: boolean
   staticReportPath?: string
-  outDir: string
+  baselinePath?: string
+  manualPath?: string
+  reportDir: string
+  outDir?: string
   json: boolean
 }
 
 const parseArgs = (argv: string[]): CliArgs => {
-  const args: CliArgs = { urls: [], noStatic: false, outDir: 'a11y-report', json: false }
+  const args: CliArgs = { urls: [], noStatic: false, reportDir: 'a11y-report', json: false }
   const next = (i: number, flag: string): string => {
     const value = argv[i]
     if (value === undefined) throw new Error(`${flag} requires a value`)
@@ -77,16 +91,38 @@ const parseArgs = (argv: string[]): CliArgs => {
     else if (arg === '--max-depth') args.maxDepth = Number(next(++i, '--max-depth'))
     else if (arg === '--no-static') args.noStatic = true
     else if (arg === '--static-report') args.staticReportPath = next(++i, '--static-report')
+    else if (arg === '--baseline') args.baselinePath = resolve(next(++i, '--baseline'))
+    else if (arg === '--manual') args.manualPath = resolve(next(++i, '--manual'))
+    else if (arg === '--report') args.reportDir = next(++i, '--report')
     else if (arg === '--out') args.outDir = next(++i, '--out')
     else if (arg === '--json') args.json = true
     else throw new Error(`Unknown argument: ${arg}\n\n${USAGE}`)
   }
-  if (args.urls.length === 0 && !args.repo) throw new Error(`Provide --url and/or --repo.\n\n${USAGE}`)
   return args
 }
 
-const main = async () => {
-  const args = parseArgs(process.argv.slice(2))
+const loadReport = async (reportDir: string): Promise<Report> =>
+  JSON.parse(await readFile(join(reportDir, 'report.json'), 'utf8'))
+
+const runMerge = async (args: CliArgs): Promise<void> => {
+  if (!args.manualPath) throw new Error('merge requires --manual <manual-review.json>')
+  const report = await loadReport(args.reportDir)
+  const manual = JSON.parse(await readFile(args.manualPath, 'utf8')) as ManualReview
+  const merged = mergeManualReview(report, manual)
+
+  const outDir = args.outDir ?? args.reportDir
+  await mkdir(outDir, { recursive: true })
+  await writeFile(join(outDir, 'final-report.json'), JSON.stringify(merged, null, 2))
+  await writeFile(join(outDir, 'final-report.md'), renderMarkdown(merged))
+  console.log(
+    `overall=${merged.overall} score=${merged.score} ` +
+      `critical=${merged.totals.critical} serious=${merged.totals.serious} ` +
+      `moderate=${merged.totals.moderate} minor=${merged.totals.minor} → ${join(outDir, 'final-report.md')}`,
+  )
+  process.exitCode = merged.overall === 'fail' ? 1 : 0
+}
+
+const runEvaluate = async (args: CliArgs): Promise<void> => {
   const meta: ReportMeta = { staticScan: 'none' }
   let staticFindings: Finding[] = []
   let stopServer: (() => Promise<void>) | undefined
@@ -121,7 +157,7 @@ const main = async () => {
       }
       if (args.crawl === undefined) args.crawl = true
     }
-
+    if (args.urls.length === 0) throw new Error(`Provide --url and/or --repo.\n\n${USAGE}`)
     if (args.staticReportPath) meta.staticScan = 'external-report'
 
     const report = await evaluate({
@@ -131,12 +167,30 @@ const main = async () => {
       maxDepth: args.maxDepth,
       staticReportPath: args.staticReportPath,
       staticFindings,
+      baselinePath: args.baselinePath,
       meta,
     })
 
-    await mkdir(args.outDir, { recursive: true })
-    await writeFile(join(args.outDir, 'report.json'), JSON.stringify(report, null, 2))
-    await writeFile(join(args.outDir, 'report.md'), renderMarkdown(report))
+    // Carry a baseline run's manual review forward as prefill for the new review page.
+    let priorManual: ManualReview | null = null
+    if (args.baselinePath) {
+      try {
+        const baseline = JSON.parse(await readFile(args.baselinePath, 'utf8')) as Report
+        priorManual = baseline.manualReview ?? null
+        if (!priorManual) {
+          const sibling = JSON.parse(await readFile(join(dirname(args.baselinePath), 'manual-review.json'), 'utf8'))
+          priorManual = sibling
+        }
+      } catch {
+        /* no prior manual review to carry forward */
+      }
+    }
+
+    const outDir = args.outDir ?? args.reportDir
+    await mkdir(outDir, { recursive: true })
+    await writeFile(join(outDir, 'report.json'), JSON.stringify(report, null, 2))
+    await writeFile(join(outDir, 'report.md'), renderMarkdown(report))
+    await writeFile(join(outDir, 'review.html'), renderReviewHtml(report, { served: false, manual: priorManual }))
 
     if (args.json) {
       console.log(JSON.stringify(report, null, 2))
@@ -145,12 +199,26 @@ const main = async () => {
         `verdict=${report.verdict} score=${report.score} ` +
           `critical=${report.totals.critical} serious=${report.totals.serious} ` +
           `moderate=${report.totals.moderate} minor=${report.totals.minor} ` +
-          `pages=${report.pages.length} static=${staticFindings.length} → ${join(args.outDir, 'report.md')}`,
+          `pages=${report.pages.length} static=${staticFindings.length}` +
+          (report.baselineDiff ? ` new=${report.baselineDiff.newCount} fixed=${report.baselineDiff.fixedCount}` : '') +
+          ` → ${join(outDir, 'report.md')} (review UI: ${join(outDir, 'review.html')})`,
       )
     }
     process.exitCode = report.verdict === 'fail' ? 1 : 0
   } finally {
     if (stopServer) await stopServer()
+  }
+}
+
+const main = async (): Promise<void> => {
+  const [subcommand, ...rest] = process.argv.slice(2)
+  if (subcommand === 'review') {
+    const args = parseArgs(rest)
+    await startReviewServer(args.reportDir, args.port ?? 4936)
+  } else if (subcommand === 'merge') {
+    await runMerge(parseArgs(rest))
+  } else {
+    await runEvaluate(parseArgs(process.argv.slice(2)))
   }
 }
 

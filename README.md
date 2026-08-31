@@ -102,6 +102,29 @@ const report = await evaluate({ urls: ['http://localhost:3000'], crawl: true, ma
 4. only after both: report "no known violations; manual criteria reviewed" — never "compliant"
 ```
 
+## Human review UI
+
+Every evaluation writes `review.html` next to the report — a self-contained, dependency-free page where a human reviewer completes the manual half of the evaluation:
+
+- **Static mode**: open the file anywhere. Progress persists in the browser (localStorage); "Export" downloads `manual-review.json`.
+- **Served mode**: `node src/cli.ts review --report a11y-report` — same page with autosave to disk, element **evidence screenshots** (captured server-side by Playwright), and one-click finalize-merge. Binds to 127.0.0.1 only.
+
+The page shows the automated findings and remediation plan for context, then walks all 16 manual criteria with per-criterion "how to review" procedures. **Content signals** keep it honest: the evaluation detects media/forms/drag/hover content per page, so criteria with no matching content get a one-click justified "Not applicable" (with auto-generated evidence), while marking a criterion N/A *against* detected signals raises a warning. Optional feedback fields (assistive tech, browser, review method, reviewer) feed the report's provenance. Dispositions without evidence are accepted but listed as **undocumented** in the final report — visible, never hidden.
+
+Merge the human's review (or an agent's) into the final verdict:
+
+```bash
+node src/cli.ts merge --report a11y-report --manual manual-review.json
+# overall = fail | issues | no-known-violations   (any manual fail ⇒ fail; exit 1)
+```
+
+The review UI is evaluated by the tool itself in CI and must score a clean pass — the checker's own UI is held to its own standard.
+
+## Mitigations and progress
+
+- **`remediationPlan`** (in every report): findings grouped by root cause, ordered by impact then reach, each with concrete steps, a good/bad example, an effort estimate, and *pitfalls* — the anti-fixes that silence the scanner while making things worse. One systemic cause (a bad color token, a repeated `div`-button component) reads as one fix, not forty findings.
+- **`--baseline previous/report.json`**: re-runs classify every finding as **new / persisting / fixed** and list what was fixed — the progress signal for fix loops, and the regression alarm for new violations. A baseline run's manual review is carried forward as prefill in the next `review.html`.
+
 ## Agent skill
 
 `skills/a11y-evaluator/SKILL.md` packages this whole process as a harness-agnostic agent skill: CLI invocation recipes, report-contract semantics, per-criterion procedures for the LLM manual review (the 16 automation blind spots), the deliverable template with a mandatory Gaps section, and the anti-claims rules. It follows the [Agent Skills](https://agentskills.io) format (`name` + `description` frontmatter), so any harness that reads `SKILL.md` files can use it:

@@ -95,7 +95,11 @@ How to review each criterion:
 
 Also re-check any axe `incomplete` items on pages where the count is non-zero (`pages[].incomplete`).
 
+**Use the content signals.** `pages[].signals` counts media, form controls, drag affordances, hover-revealed content, foreign-language parts, and iframes per page. A criterion whose gating signal is 0 across all pages may be dispositioned `not-applicable` with the signal as evidence ("no media detected across N pages"). A criterion with signals present must never be marked N/A — the signals name the exact pages to inspect.
+
 Record manual findings in the same shape as tool findings, with `engine: "agent"` and your evidence in `description` — downstream fixers then consume one uniform list.
+
+**Working with a human reviewer instead?** Every evaluation writes `review.html` next to the report — a self-contained page where a human walks the same checklist (signal-guarded N/A, evidence fields, optional AT/browser feedback). `node src/cli.ts review --report <dir>` serves it with autosave and evidence screenshots; `node src/cli.ts merge --report <dir> --manual manual-review.json` merges their dispositions the same way yours are merged. Do not duplicate a human's manual pass — merge it.
 
 ## Phase 4 — Deliver the evaluation
 
@@ -116,9 +120,18 @@ Final verdict = worst of (automated verdict, manual pass): any manual `fail` on 
 
 The **Gaps** section is mandatory. An evaluation that hides its blind spots is worse than no evaluation.
 
+## Phase 5 — Recommend mitigations
+
+The report's `remediationPlan` groups findings by root cause, ordered by impact then reach, each with deterministic steps, an example, effort, and **pitfalls** (anti-fixes: `tabindex` on a div, `aria-hidden` to silence a finding, eyeballed contrast). Build your recommendations on it, then add what only you can:
+
+1. **Locate the source** (repo mode): grep the repo for the finding's html snippet, class names, or component text; static findings already carry `file:line:col`. Name the file to change, not just the selector.
+2. **Propose the concrete change** — a diff or exact replacement markup — honoring the catalog's pitfalls. One structural fix often clears several findings (a `div`→`button` swap fixes 2.1.1 + 4.1.2 and often 2.5.8): say so.
+3. **Order by leverage**: critical → serious → manual fails → moderate/minor, but surface "one token/component fixes N findings" opportunities first within each tier.
+4. Include manual-pass failures in the plan — they have no `remediationPlan` entry, so write their mitigation from your evidence.
+
 ## Fix-and-re-evaluate loop
 
-If you are also fixing (or feeding a fixer agent): fix critical → serious first (runtime findings give selector + html snippet; static give file:line:col), rerun the CLI after each batch, and repeat until `verdict != fail`; then redo the manual pass on changed pages. The CLI's exit code makes this loopable in CI: `node src/cli.ts --repo . && echo gate-passed`.
+If you are also fixing (or feeding a fixer agent): fix critical → serious first (runtime findings give selector + html snippet; static give file:line:col), rerun the CLI after each batch, and repeat until `verdict != fail`; then redo the manual pass on changed pages. Pass `--baseline <previous report.json>` on re-runs — the report then classifies findings as **new / persisting / fixed**, which is your progress signal and catches regressions your fixes introduce. The CLI's exit code makes this loopable in CI: `node src/cli.ts --repo . && echo gate-passed`.
 
 ## What not to do
 
@@ -135,7 +148,8 @@ If you are also fixing (or feeding a fixer agent): fix critical → serious firs
 - [ ] CLI ran successfully (exit 0/1, not 2) on repo and/or seeded URLs
 - [ ] Important routes covered (crawl + explicit seeds); uncovered ones listed in Gaps
 - [ ] All automated findings reported with selectors/locations, none silently dropped
-- [ ] All 16 manual criteria dispositioned with evidence
+- [ ] All 16 manual criteria dispositioned with evidence (content signals used for N/A justifications)
 - [ ] axe `incomplete` items re-checked on affected pages
 - [ ] Final verdict merges automated + manual; Gaps section present
+- [ ] Fix recommendations grounded in the report's `remediationPlan` (grouped by root cause, pitfalls respected), with source locations in repo mode
 - [ ] No compliance claim anywhere in the deliverable
