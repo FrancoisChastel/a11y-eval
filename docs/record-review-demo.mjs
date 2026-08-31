@@ -1,6 +1,6 @@
 // Records docs/demo-review-ui.gif source video by driving the review UI.
 // Usage: node docs/record-review-demo.mjs <path-to-review.html> <out.webm>
-// Regenerate after UI changes, then convert with ffmpeg (see docs/demo-cli.tape header comment).
+// Regenerate after UI changes, then convert with the ffmpeg palette pass documented in README.md (Development).
 import { chromium } from 'playwright'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
