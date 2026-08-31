@@ -122,12 +122,12 @@ The **Gaps** section is mandatory. An evaluation that hides its blind spots is w
 
 ## Phase 5 — Recommend mitigations
 
-The report's `remediationPlan` groups findings by root cause, ordered by impact then reach, each with deterministic steps, an example, effort, and **pitfalls** (anti-fixes: `tabindex` on a div, `aria-hidden` to silence a finding, eyeballed contrast). Build your recommendations on it, then add what only you can:
+Every evaluation writes **`mitigations.md`** — the agent-facing work order: rules of engagement, one section per root-cause group (fix, steps, before/after, binding **Do NOT** pitfalls, rule docs, and every instance with selector + html snippet or `file:line:col`), plus the exact verification command. **Start from it; do not re-derive it.** Regenerate on demand with `node src/cli.ts mitigate --report <dir>` (it prefers `final-report.json`, so merged manual failures are included). Then add what only you can:
 
-1. **Locate the source** (repo mode): grep the repo for the finding's html snippet, class names, or component text; static findings already carry `file:line:col`. Name the file to change, not just the selector.
+1. **Locate the source** (repo mode): grep the repo for each instance's html snippet or class names; static findings already carry `file:line:col`. Name the file to change, not just the selector.
 2. **Propose the concrete change** — a diff or exact replacement markup — honoring the catalog's pitfalls. One structural fix often clears several findings (a `div`→`button` swap fixes 2.1.1 + 4.1.2 and often 2.5.8): say so.
-3. **Order by leverage**: critical → serious → manual fails → moderate/minor, but surface "one token/component fixes N findings" opportunities first within each tier.
-4. Include manual-pass failures in the plan — they have no `remediationPlan` entry, so write their mitigation from your evidence.
+3. **Author mitigations for manual failures** — their `mitigations.md` sections carry the reviewer's evidence as the specification; the concrete change is yours to derive, and the criterion must be re-reviewed after fixing (automation cannot verify it).
+4. **Order by leverage**: follow the work order's ordering, but surface "one token/component fixes N findings" opportunities first within each tier.
 
 ## Fix-and-re-evaluate loop
 

@@ -78,6 +78,21 @@ jobs:
             if (!r.findings.some(f => f.engine === 'human')) { console.error('missing human finding'); process.exit(1); }
           "
 
+      - name: Integration — mitigations.md is an executable work order (both modes)
+        run: |
+          node -e "
+            const fs = require('fs');
+            const md = fs.readFileSync('/tmp/r-crawl/mitigations.md', 'utf8');
+            for (const needle of ['Rules of engagement', 'image-alt', 'Do NOT', 'Instances to fix', '--baseline']) {
+              if (!md.includes(needle)) { console.error('mitigations.md missing:', needle); process.exit(1); }
+            }
+          "
+          node src/cli.ts mitigate --report /tmp/r-crawl
+          node -e "
+            const md = require('fs').readFileSync('/tmp/r-crawl/mitigations.md', 'utf8');
+            if (!md.includes('Manual review failures')) { console.error('mitigate did not include merged manual failures'); process.exit(1); }
+          "
+
       - name: Integration — baseline diff classifies fixed findings
         run: |
           node src/cli.ts --url test-fixtures/site/page2.html --baseline /tmp/r-crawl/report.json --out /tmp/r-baseline || true

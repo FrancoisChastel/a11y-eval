@@ -33,7 +33,7 @@ node src/cli.ts --repo /path/to/your-app --url http://localhost:3000 --crawl
 node src/cli.ts --url http://localhost:3000 --crawl
 ```
 
-Outputs `report.json` (agent contract) and `report.md` (human summary) to `--out` (default `a11y-report/`). Exit codes: `0` pass / pass-with-issues, `1` fail (critical or serious violations — CI gate), `2` error.
+Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `report.md` (human summary: at-a-glance, top fixes, findings, signals, gaps, next steps), `mitigations.md` (agent-executable fix work order), and `review.html` (human manual-review UI). Exit codes: `0` pass / pass-with-issues, `1` fail (critical or serious violations — CI gate), `2` error.
 
 ## What repo mode does
 
@@ -132,8 +132,16 @@ The review UI is evaluated by the tool itself in CI and must score a clean pass 
 
 ## Mitigations and progress
 
-- **`remediationPlan`** (in every report): findings grouped by root cause, ordered by impact then reach, each with concrete steps, a good/bad example, an effort estimate, and *pitfalls* — the anti-fixes that silence the scanner while making things worse. One systemic cause (a bad color token, a repeated `div`-button component) reads as one fix, not forty findings.
-- **`--baseline previous/report.json`**: re-runs classify every finding as **new / persisting / fixed** and list what was fixed — the progress signal for fix loops, and the regression alarm for new violations. A baseline run's manual review is carried forward as prefill in the next `review.html`.
+Every evaluation (and every merge) writes **`mitigations.md`** — an agent-executable work order, not a report. It opens with rules of engagement (one group per change-set, every "Do NOT" is binding, never delete features to pass), then one section per root-cause group: the fix, steps, a before/after example, the anti-fix pitfalls, rule docs, and **every instance to fix** — CSS selector + offending HTML snippet for runtime findings, `file:line:col` for static ones — closing with the exact verification command (`your original invocation` + `--baseline`). Manual-review failures get their own evidence-driven sections: the reviewer's evidence *is* the specification, since no catalog exists for judgment criteria. Hand the file to a coding agent as-is.
+
+Two modes:
+
+- **Automatic** — written alongside `report.json` on every evaluation, and refreshed on every merge (CLI or review-UI finalize) so human failures flow in.
+- **Manual** — `node src/cli.ts mitigate --report <dir>` regenerates on demand, preferring `final-report.json` when present.
+
+Under the hood, the report's **`remediationPlan`** groups findings by root cause, ordered by impact then reach — one systemic cause (a bad color token, a repeated `div`-button component) reads as one fix, not forty findings.
+
+**`--baseline previous/report.json`**: re-runs classify every finding as **new / persisting / fixed** and list what was fixed — the progress signal for fix loops, and the regression alarm for new violations. A baseline run's manual review is carried forward as prefill in the next `review.html`.
 
 ## Agent skill
 

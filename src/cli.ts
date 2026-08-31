@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { evaluate } from './evaluate.ts'
 import { mergeManualReview } from './merge.ts'
+import { renderMitigations } from './mitigations.ts'
 import { detectRepo } from './repo/detect.ts'
 import { startServer } from './repo/server.ts'
 import { runStaticScan } from './repo/staticScan.ts'
@@ -19,6 +20,7 @@ Usage:
   node src/cli.ts --repo <dir> [--url <url>]                # repo mode: static scan + start + crawl
   node src/cli.ts review [--report <dir>] [--port <n>]      # serve the manual-review UI
   node src/cli.ts merge --report <dir> --manual <file>      # merge a manual review into a final report
+  node src/cli.ts mitigate [--report <dir>]                 # regenerate mitigations.md (agent work order)
 
 Evaluate options:
   --url <url>            Seed page. http(s)://, file://, or local HTML path. Repeatable.
@@ -45,6 +47,13 @@ Merge options (subcommand "merge"):
   --report <dir>         Directory containing report.json (default: a11y-report).
   --manual <path>        manual-review.json exported from the review UI.
   --out <dir>            Output directory (default: same as --report).
+
+Mitigate options (subcommand "mitigate"):
+  --report <dir>         Directory containing report.json (default: a11y-report).
+                         Uses final-report.json when present so manual failures are included.
+
+Mitigations run in two modes: automatic (every evaluation and merge writes
+mitigations.md) and manual (the "mitigate" subcommand regenerates it on demand).
 
 Exit codes: 0 = pass or pass-with-issues, 1 = fail (critical/serious violations, or a
 manual fail after merge), 2 = usage/runtime error.`
@@ -114,12 +123,29 @@ const runMerge = async (args: CliArgs): Promise<void> => {
   await mkdir(outDir, { recursive: true })
   await writeFile(join(outDir, 'final-report.json'), JSON.stringify(merged, null, 2))
   await writeFile(join(outDir, 'final-report.md'), renderMarkdown(merged))
+  await writeFile(join(outDir, 'mitigations.md'), renderMitigations(merged))
   console.log(
     `overall=${merged.overall} score=${merged.score} ` +
       `critical=${merged.totals.critical} serious=${merged.totals.serious} ` +
-      `moderate=${merged.totals.moderate} minor=${merged.totals.minor} → ${join(outDir, 'final-report.md')}`,
+      `moderate=${merged.totals.moderate} minor=${merged.totals.minor} → ${join(outDir, 'final-report.md')} (+ mitigations.md)`,
   )
   process.exitCode = merged.overall === 'fail' ? 1 : 0
+}
+
+const runMitigate = async (args: CliArgs): Promise<void> => {
+  let report: Report
+  try {
+    report = JSON.parse(await readFile(join(args.reportDir, 'final-report.json'), 'utf8'))
+    console.error('using final-report.json (manual review included)')
+  } catch {
+    report = await loadReport(args.reportDir)
+  }
+  const out = join(args.outDir ?? args.reportDir, 'mitigations.md')
+  await mkdir(args.outDir ?? args.reportDir, { recursive: true })
+  await writeFile(out, renderMitigations(report))
+  const groups = (report.remediationPlan ?? []).filter((g) => g.engine !== 'human' && g.engine !== 'agent').length
+  const manualFails = report.manualReview?.items.filter((i) => i.status === 'fail').length ?? 0
+  console.log(`groups=${groups} manual-failures=${manualFails} → ${out}`)
 }
 
 const runEvaluate = async (args: CliArgs): Promise<void> => {
@@ -160,6 +186,11 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
     if (args.urls.length === 0) throw new Error(`Provide --url and/or --repo.\n\n${USAGE}`)
     if (args.staticReportPath) meta.staticScan = 'external-report'
 
+    // Record the invocation (minus any --baseline pair) so mitigations.md can
+    // quote an exact verification command.
+    const argvTail = process.argv.slice(2).filter((a, i, all) => a !== '--baseline' && all[i - 1] !== '--baseline')
+    meta.command = ['node src/cli.ts', ...argvTail].join(' ')
+
     const report = await evaluate({
       urls: args.urls,
       crawl: args.crawl ?? false,
@@ -190,6 +221,7 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
     await mkdir(outDir, { recursive: true })
     await writeFile(join(outDir, 'report.json'), JSON.stringify(report, null, 2))
     await writeFile(join(outDir, 'report.md'), renderMarkdown(report))
+    await writeFile(join(outDir, 'mitigations.md'), renderMitigations(report))
     await writeFile(join(outDir, 'review.html'), renderReviewHtml(report, { served: false, manual: priorManual }))
 
     if (args.json) {
@@ -217,6 +249,8 @@ const main = async (): Promise<void> => {
     await startReviewServer(args.reportDir, args.port ?? 4936)
   } else if (subcommand === 'merge') {
     await runMerge(parseArgs(rest))
+  } else if (subcommand === 'mitigate') {
+    await runMitigate(parseArgs(rest))
   } else {
     await runEvaluate(parseArgs(process.argv.slice(2)))
   }

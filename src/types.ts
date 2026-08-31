@@ -124,6 +124,8 @@ export interface ReportMeta {
   /** True when pages were discovered by crawling rather than listed explicitly. */
   crawled?: boolean
   seeds?: string[]
+  /** The CLI invocation that produced this report — quoted verbatim in verification steps. */
+  command?: string
 }
 
 export interface Report {

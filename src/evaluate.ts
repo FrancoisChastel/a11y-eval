@@ -11,7 +11,7 @@ import { computeScore, computeTotals, computeVerdict } from './scoring.ts'
 import type { BaselineDiff, EvaluateOptions, Finding, PageResult, Report } from './types.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from './wcag.ts'
 
-export const VERSION = '0.4.0'
+export const VERSION = '0.5.0'
 
 const DEFAULT_MAX_PAGES = 15
 const DEFAULT_MAX_DEPTH = 3

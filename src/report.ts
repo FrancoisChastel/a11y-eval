@@ -1,9 +1,108 @@
-import type { Finding, Report } from './types.ts'
+import type { ContentSignals, Finding, Report } from './types.ts'
 
 const IMPACT_ORDER = ['critical', 'serious', 'moderate', 'minor'] as const
 
 const sortedFindings = (findings: Finding[]): Finding[] =>
   [...findings].sort((a, b) => IMPACT_ORDER.indexOf(a.impact) - IMPACT_ORDER.indexOf(b.impact))
+
+const cell = (value: string): string => value.replace(/\|/g, '\\|').replaceAll('\n', ' ')
+
+const SIGNAL_LABELS: Record<keyof ContentSignals, string> = {
+  media: 'Media',
+  forms: 'Form controls',
+  drag: 'Drag affordances',
+  hoverContent: 'Hover/focus content',
+  langParts: 'Foreign-language parts',
+  iframes: 'Iframes',
+}
+
+const atAGlance = (report: Report): string[] => {
+  const engines = new Set(report.findings.map((f) => f.engine))
+  const enginesRan = ['axe', 'keyboard', ...(report.meta?.staticScan && report.meta.staticScan !== 'none' ? [`static (${report.meta.staticScan})`] : [])]
+  const manualState = !report.manualReview
+    ? 'not started — open review.html or run the a11y-evaluator skill'
+    : report.manualChecklist.every((c) => report.manualReview?.items.some((i) => i.sc === c.sc))
+      ? `complete (${report.manualReview.items.length} criteria)`
+      : `incomplete (${report.manualReview.items.length}/${report.manualChecklist.length} criteria)`
+  const rows: [string, string][] = [
+    ['Result', report.overall ? `${report.overall} (automated verdict: ${report.verdict})` : report.verdict],
+    ['Score', `${report.score}/100 (progress metric — gate on verdict, not score)`],
+    ['Pages', `${report.pages.length}${report.meta?.crawled ? ` (crawled from ${report.meta.seeds?.length ?? 1} seed(s))` : ''}`],
+    ['Engines', enginesRan.join(' · ') + (engines.has('human') ? ' · human review' : '') + (engines.has('agent') ? ' · agent review' : '')],
+    ['Fix groups', `${(report.remediationPlan ?? []).length} — full agent work order in mitigations.md`],
+    ['Manual review', manualState],
+  ]
+  if (report.baselineDiff) {
+    rows.splice(3, 0, ['Versus baseline', `${report.baselineDiff.newCount} new · ${report.baselineDiff.persistingCount} persisting · ${report.baselineDiff.fixedCount} fixed`])
+  }
+  return [`| | |`, `|---|---|`, ...rows.map(([k, v]) => `| **${k}** | ${cell(v)} |`), '']
+}
+
+const signalsSummary = (report: Report): string[] => {
+  const pagesWithSignals = report.pages.filter((p) => p.signals)
+  if (pagesWithSignals.length === 0) return []
+  const totals = {} as Record<keyof ContentSignals, number>
+  for (const key of Object.keys(SIGNAL_LABELS) as (keyof ContentSignals)[]) {
+    totals[key] = pagesWithSignals.reduce((sum, p) => sum + (p.signals?.[key] ?? 0), 0)
+  }
+  return [
+    `## Content signals`,
+    '',
+    `Detected content types gate which manual criteria apply (zero across all pages → justified N/A).`,
+    '',
+    `| Signal | Total | Pages with occurrences |`,
+    `|---|---|---|`,
+    ...(Object.keys(SIGNAL_LABELS) as (keyof ContentSignals)[]).map((key) => {
+      const pages = pagesWithSignals.filter((p) => (p.signals?.[key] ?? 0) > 0).map((p) => p.url)
+      return `| ${SIGNAL_LABELS[key]} | ${totals[key]} | ${cell(pages.join(', ') || '—')} |`
+    }),
+    '',
+  ]
+}
+
+const gaps = (report: Report): string[] => {
+  const items: string[] = []
+  if (!report.meta?.staticScan || report.meta.staticScan === 'none') {
+    items.push('No static source scan ran (URL mode) — source-level issues on unrendered components are invisible to this report.')
+  } else if (report.meta.staticScan === 'skipped') {
+    items.push(`Static scan was skipped: ${report.meta.staticScanNote ?? 'no note recorded'}.`)
+  }
+  const incompleteTotal = report.pages.reduce((sum, p) => sum + p.incomplete, 0)
+  if (incompleteTotal > 0) {
+    const affected = report.pages.filter((p) => p.incomplete > 0).map((p) => `${p.url} (${p.incomplete})`)
+    items.push(`axe marked ${incompleteTotal} check(s) as needing human confirmation: ${affected.join(', ')}.`)
+  }
+  if (!report.manualReview) {
+    items.push('The manual half of the evaluation has not been done — the 16 checklist criteria below are unverified.')
+  } else {
+    const missing = report.manualChecklist.filter((c) => !report.manualReview?.items.some((i) => i.sc === c.sc))
+    if (missing.length > 0) items.push(`Manual criteria not yet dispositioned: ${missing.map((c) => c.sc).join(', ')}.`)
+    if (report.undocumentedDispositions && report.undocumentedDispositions.length > 0) {
+      items.push(`Dispositions recorded without evidence: ${report.undocumentedDispositions.join(', ')}.`)
+    }
+    const experts = report.manualReview.items.filter((i) => i.status === 'needs-expert')
+    if (experts.length > 0) items.push(`Deferred to a human specialist: ${experts.map((i) => i.sc).join(', ')}.`)
+  }
+  if (report.meta?.crawled) {
+    items.push('Only crawl-reachable pages were evaluated — SPA-only routes, auth-gated pages, and form-flow steps need explicit --url seeds.')
+  }
+  return [`## Gaps — what this report does NOT cover`, '', ...items.map((i) => `- ${i}`), '']
+}
+
+const nextSteps = (report: Report): string[] => {
+  const steps: string[] = []
+  if (!report.manualReview) {
+    steps.push(
+      'Complete the manual review: open `review.html` (static) or serve it with `a11y-eval review --report <this dir>` (autosave + evidence screenshots), then `a11y-eval merge --report <this dir> --manual manual-review.json`.',
+    )
+  }
+  if ((report.remediationPlan ?? []).length > 0 || report.manualReview?.items.some((i) => i.status === 'fail')) {
+    steps.push('Execute fixes from `mitigations.md` (the agent work order), one group per change-set.')
+    steps.push(`Verify each batch by re-running with \`--baseline <this dir>/report.json\` — fixed findings are tracked, regressions surface as new.`)
+  }
+  if (steps.length === 0) steps.push('No automated findings and the manual review is merged — archive this report as the baseline for future runs.')
+  return [`## Next steps`, '', ...steps.map((s, i) => `${i + 1}. ${s}`), '']
+}
 
 export const renderMarkdown = (report: Report): string => {
   const headline = report.overall
@@ -14,6 +113,7 @@ export const renderMarkdown = (report: Report): string => {
     '',
     `${headline} · Score: ${report.score}/100 · ${report.findings.length} finding(s) across ${report.pages.length} page(s)`,
     '',
+    ...atAGlance(report),
     `| Critical | Serious | Moderate | Minor |`,
     `|---|---|---|---|`,
     `| ${report.totals.critical} | ${report.totals.serious} | ${report.totals.moderate} | ${report.totals.minor} |`,
@@ -22,24 +122,32 @@ export const renderMarkdown = (report: Report): string => {
     '',
   ]
 
-  if (report.baselineDiff) {
-    const d = report.baselineDiff
-    lines.push(
-      `**Versus baseline** (${d.baselinePath}): ${d.newCount} new · ${d.persistingCount} persisting · ${d.fixedCount} fixed`,
-      '',
-    )
-    if (d.fixed.length > 0) {
-      lines.push(...d.fixed.map((f) => `- Fixed: ${f.ruleId} on ${f.page} (\`${f.target}\`)`), '')
-    }
+  if (report.baselineDiff && report.baselineDiff.fixed.length > 0) {
+    lines.push(`## Fixed since baseline`, '', ...report.baselineDiff.fixed.map((f) => `- ${f.ruleId} on ${f.page} (\`${f.target}\`)`), '')
   }
 
+  if (report.remediationPlan && report.remediationPlan.length > 0) {
+    lines.push(
+      `## Top fixes`,
+      '',
+      `Ordered by impact, then reach. Per-instance details, examples, and pitfalls are in **mitigations.md**.`,
+      '',
+      ...report.remediationPlan.slice(0, 5).map(
+        (g, i) => `${i + 1}. **[${g.impact}] ${g.ruleId}** — ${g.findingCount} finding(s) on ${g.pages.length} page(s) · ${g.recommendation.summary} _(effort: ${g.recommendation.effort})_`,
+      ),
+      ...(report.remediationPlan.length > 5 ? [`${report.remediationPlan.length - 5} more group(s) in mitigations.md.`] : []),
+      '',
+    )
+  }
+
+  lines.push(`## Findings by page`, '')
   for (const page of report.pages) {
-    lines.push(`## ${page.url}`, '', `${page.findings.length} finding(s) · ${page.passes} axe rules passed · ${page.incomplete} incomplete (need review)`, '')
+    lines.push(`### ${page.url}`, '', `${page.findings.length} finding(s) · ${page.passes} axe rules passed · ${page.incomplete} incomplete (need review)`, '')
     if (page.findings.length > 0) {
       lines.push(`| Impact | Rule | WCAG | Target | Description |`, `|---|---|---|---|---|`)
       for (const f of sortedFindings(page.findings)) {
-        const target = f.targets[0]?.replace(/\|/g, '\\|') ?? ''
-        lines.push(`| ${f.impact} | ${f.ruleId} | ${f.wcag.join(', ') || '—'} | \`${target}\` | ${f.description.replace(/\|/g, '\\|')} |`)
+        const impact = f.baselineStatus ? `${f.impact} (${f.baselineStatus})` : f.impact
+        lines.push(`| ${impact} | ${f.ruleId} | ${f.wcag.join(', ') || '—'} | \`${cell(f.targets[0] ?? '')}\` | ${cell(f.description)} |`)
       }
       lines.push('')
     }
@@ -49,24 +157,12 @@ export const renderMarkdown = (report: Report): string => {
   if (staticFindings.length > 0) {
     lines.push(`## Static analysis findings`, '', `| Impact | Rule | Location | Description |`, `|---|---|---|---|`)
     for (const f of sortedFindings(staticFindings)) {
-      lines.push(`| ${f.impact} | ${f.ruleId} | \`${f.targets[0] ?? ''}\` | ${f.description.replace(/\|/g, '\\|')} |`)
+      lines.push(`| ${f.impact} | ${f.ruleId} | \`${cell(f.targets[0] ?? '')}\` | ${cell(f.description)} |`)
     }
     lines.push('')
   }
 
-  if (report.remediationPlan && report.remediationPlan.length > 0) {
-    lines.push(`## Recommended fixes (grouped by root cause, in order)`, '')
-    for (const [index, group] of report.remediationPlan.entries()) {
-      const r = group.recommendation
-      lines.push(
-        `${index + 1}. **[${group.impact}] ${group.ruleId}** — ${group.findingCount} finding(s) on ${group.pages.length} page(s) · effort: ${r.effort}`,
-        `   ${r.summary}`,
-        ...r.steps.map((s) => `   - ${s}`),
-        ...r.pitfalls.map((p) => `   - Pitfall: ${p}`),
-      )
-    }
-    lines.push('')
-  }
+  lines.push(...signalsSummary(report))
 
   if (report.manualReview) {
     lines.push(`## Manual review`, '')
@@ -80,17 +176,9 @@ export const renderMarkdown = (report: Report): string => {
     if (context.length > 0) lines.push(context.join(' · '), '')
     lines.push(`| SC | Status | Method | Evidence |`, `|---|---|---|---|`)
     for (const item of report.manualReview.items) {
-      const evidence = (item.evidence ?? '').replaceAll('|', '\\|').replaceAll('\n', ' ')
-      lines.push(`| ${item.sc} | ${item.status}${item.autoSuggested ? ' (auto-suggested)' : ''} | ${item.method ?? '—'} | ${evidence || '—'} |`)
+      lines.push(`| ${item.sc} | ${item.status}${item.autoSuggested ? ' (auto-suggested)' : ''} | ${item.method ?? '—'} | ${cell(item.evidence ?? '') || '—'} |`)
     }
     lines.push('')
-    if (report.undocumentedDispositions && report.undocumentedDispositions.length > 0) {
-      lines.push(`**Undocumented dispositions** (status recorded without evidence): ${report.undocumentedDispositions.join(', ')}`, '')
-    }
-    const missing = report.manualChecklist.filter((c) => !report.manualReview?.items.some((i) => i.sc === c.sc))
-    if (missing.length > 0) {
-      lines.push(`**Not yet dispositioned**: ${missing.map((c) => c.sc).join(', ')}`, '')
-    }
   } else {
     lines.push(
       `## Manual review required (automation blind spots)`,
@@ -101,6 +189,9 @@ export const renderMarkdown = (report: Report): string => {
       '',
     )
   }
+
+  lines.push(...gaps(report))
+  lines.push(...nextSteps(report))
 
   return lines.join('\n')
 }

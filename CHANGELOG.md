@@ -3,6 +3,18 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.5.0] - 2026-08-31
+
+### Added
+
+- **`mitigations.md` — agent-executable work order**, written automatically by every evaluation and every merge (CLI and review-UI finalize), regenerable on demand with the **`mitigate` subcommand** (prefers `final-report.json` so manual failures are included). Contains rules of engagement, per-group fix/steps/before-after/pitfalls/docs, **every instance** (selector + html snippet, or `file:line:col` for static), evidence-driven sections for manual-review failures, a needs-expert list, and the exact verification command (original invocation + `--baseline`, recorded as `meta.command`).
+- Skill Phase 5 now consumes the work order instead of re-deriving it.
+- CI asserts the work order's content in both automatic and manual modes.
+
+### Changed
+
+- **`report.md` restructured**: at-a-glance table (result, pages, engines, baseline, fix groups, manual-review state), Top fixes summary (details moved to mitigations.md), per-page findings, content-signals table, **Gaps — what this report does NOT cover** (static-scan state, axe incompletes, undispositioned/undocumented criteria, crawl coverage), and a Next steps section with concrete commands.
+
 ## [0.4.0] - 2026-08-31
 
 ### Added

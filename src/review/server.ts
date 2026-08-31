@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { basename, join } from 'node:path'
 import { chromium, type Browser } from 'playwright'
 import { mergeManualReview } from '../merge.ts'
+import { renderMitigations } from '../mitigations.ts'
 import { renderMarkdown } from '../report.ts'
 import type { ManualReview, Report } from '../types.ts'
 import { renderReviewHtml } from './render.ts'
@@ -92,6 +93,7 @@ export const startReviewServer = async (reportDir: string, port: number): Promis
         const merged = mergeManualReview(await loadReport(), manual)
         await writeFile(join(reportDir, 'final-report.json'), JSON.stringify(merged, null, 2))
         await writeFile(join(reportDir, 'final-report.md'), renderMarkdown(merged))
+        await writeFile(join(reportDir, 'mitigations.md'), renderMitigations(merged))
         send(res, 200, JSON.stringify({ overall: merged.overall, score: merged.score, totals: merged.totals, out: join(reportDir, 'final-report.md') }))
       } else {
         send(res, 404, '{"error":"not found"}')
