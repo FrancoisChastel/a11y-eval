@@ -1,0 +1,16 @@
+export const theme = {
+  bg: '#1e2030',
+  card: '#24273a',
+  surface: '#363a4f',
+  border: '#494d64',
+  text: '#cad3f5',
+  subtext: '#a5adcb',
+  blue: '#8aadf4',
+  green: '#a6da95',
+  red: '#ed8796',
+  yellow: '#eed49f',
+  mauve: '#c6a0f6',
+  teal: '#8bd5ca',
+  mono: 'Menlo, Monaco, "SF Mono", monospace',
+  sans: '-apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
+}

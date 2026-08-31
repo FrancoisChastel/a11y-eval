@@ -1,0 +1,20 @@
+{
+  "name": "a11y-eval-explainer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion explainer video for a11y-eval — animated terminal walkthrough of the evaluation pipeline",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Explainer out/a11y-eval-explainer.mp4 --codec h264",
+    "poster": "remotion still src/index.ts Explainer ../docs/explainer-poster.png --frame 400"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.519",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "4.0.519"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0"
+  }
+}

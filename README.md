@@ -9,6 +9,10 @@ WCAG 2.2 AA evaluation tool built entirely on open-source components. Point it a
 
 ## Demo
 
+**60-second explainer** (Remotion-rendered walkthrough of the whole pipeline — click to watch):
+
+[![Watch the a11y-eval explainer video: one command evaluates a repo, artifacts, suspects vs violations, the review UI, mitigation work orders, and the baseline fix loop](docs/explainer-poster.png)](https://github.com/FrancoisChastel/a11y-eval/releases/download/v0.8.0/a11y-eval-explainer.mp4)
+
 Evaluate a site — crawl, engines, verdict, remediation plan:
 
 ![CLI demo: crawling a site, findings summary, remediation plan, and the generated review UI](docs/demo-cli.gif)
@@ -197,7 +201,7 @@ node src/cli.ts --repo test-fixtures/mini-app --no-crawl --url test-fixtures/sit
 
 The unit-test count grows with the suite — `pnpm test` prints the current number (45 as of v0.4.0).
 
-Regenerating the README demo GIFs after UI/CLI changes: `vhs docs/demo-cli.tape` for the terminal demo, and `node docs/record-review-demo.mjs <review.html> out.webm` followed by an ffmpeg palette pass (fps 7, 820px wide, 64 colors) for the review-UI demo.
+Regenerating the README demos after UI/CLI changes: `vhs docs/demo-cli.tape` for the terminal GIF; `node docs/record-review-demo.mjs <review.html> out.webm` + an ffmpeg palette pass (fps 7, 820px, 64 colors) for the review-UI GIF; and for the explainer video, `cd video && pnpm install && pnpm render` (Remotion — scenes in `video/src/`, terminal transcripts kept verbatim from real runs in `video/src/content.ts`), then `pnpm poster` and upload the mp4 as a release asset.
 
 ## Known limitations
 

@@ -54,14 +54,19 @@ await scrollTo(page.locator('#plan h2'))
 await moveAndClick(page.locator('#plan details > summary').first())
 await pause(1600)
 
-// 2. Signal-suggested N/A on the first media criterion
-const firstCriterion = page.locator('fieldset.criterion').first()
-await scrollTo(firstCriterion)
-await pause(700)
-await moveAndClick(firstCriterion.locator('.suggestion button'))
+// 2. Machine-flagged suspects pre-filling a criterion (1.2.2: video without caption track)
+const captions = page.locator('fieldset.criterion', { has: page.locator('legend', { hasText: '1.2.2' }) })
+await scrollTo(captions)
+await pause(2200)
+
+// 3. Signal-suggested N/A on a zero-signal criterion (2.5.7 Dragging)
+const dragging = page.locator('fieldset.criterion', { has: page.locator('legend', { hasText: '2.5.7' }) })
+await scrollTo(dragging)
+await pause(500)
+await moveAndClick(dragging.locator('.suggestion button'))
 await pause(1400)
 
-// 3. Fail 2.4.3 Focus Order with typed evidence
+// 4. Fail 2.4.3 Focus Order — its suspects panel shows the detected tab-order jump
 const focusOrder = page.locator('fieldset.criterion', { has: page.locator('legend', { hasText: '2.4.3' }) })
 await scrollTo(focusOrder)
 await moveAndClick(focusOrder.locator('input[value="fail"]'))
@@ -71,7 +76,7 @@ await moveAndClick(evidence)
 await evidence.pressSequentially('Tab order jumps to the footer mid-form on flawed.html.', { delay: 28 })
 await pause(900)
 
-// 4. Progress + export in the sticky footer
+// 5. Progress + export in the sticky footer
 await scrollTo(page.locator('#app-footer button').first())
 await page.mouse.move(640, 740, { steps: 15 })
 await pause(2200)

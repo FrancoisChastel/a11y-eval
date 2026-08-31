@@ -3,3 +3,5 @@ coverage/
 a11y-report/
 *.log
 .DS_Store
+video/out/
+video/node_modules/
