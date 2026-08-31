@@ -1,0 +1,2 @@
+# Full optimization runs only — the metric layer and --dry-run are stdlib-only.
+dspy>=3.0.0

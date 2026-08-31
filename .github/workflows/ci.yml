@@ -93,6 +93,9 @@ jobs:
             if (!md.includes('Manual review failures')) { console.error('mitigate did not include merged manual failures'); process.exit(1); }
           "
 
+      - name: Optimizer — metric dry run (identity low, hand-fixed 1.0, deletion guarded)
+        run: python3 optimizer/optimize.py --dry-run
+
       - name: Integration — baseline diff classifies fixed findings
         run: |
           node src/cli.ts --url test-fixtures/site/page2.html --baseline /tmp/r-crawl/report.json --out /tmp/r-baseline || true

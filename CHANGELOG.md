@@ -3,6 +3,15 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.7.0] - 2026-08-31
+
+### Added
+
+- **a11y-fixer skill** (`skills/a11y-fixer/SKILL.md`): executes mitigation work orders with minimal, semantics-first patches; its core instruction block sits between machine-managed `OPTIMIZED-INSTRUCTIONS` markers.
+- **Automatic skill improvement** (`optimizer/`): DSPy/GEPA loop using a11y-eval's deterministic score as the metric — candidate instructions fix broken fixtures, the evaluator scores each fix, its findings feed GEPA's reflection, and a feature-preservation guard (≥85% visible text retained) zeroes delete-to-pass candidates. Winning instructions are spliced back into the skill with `--apply`. `--dry-run` exercises the metric leg with zero LM calls; `--page` trains on snapshots of your own repo's failing pages.
+- `docs/skill-optimization.md` (how the loop works, cost honesty, bring-your-own-repo) and `agents/skill-optimizer.md` (one-flow agent for a given repo: baseline → snapshot → optimize → prove the delta).
+- CI runs the optimizer dry run (no LM spend).
+
 ## [0.6.0] - 2026-08-31
 
 ### Added

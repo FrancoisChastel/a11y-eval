@@ -156,6 +156,21 @@ cp -r skills/a11y-evaluator ~/.claude/skills/
 
 `agents/a11y-evaluator.md` is a ready-made Claude Code subagent definition wrapping the skill (`cp agents/a11y-evaluator.md ~/.claude/agents/`).
 
+## Fixer skill + automatic skill improvement (DSPy/GEPA)
+
+`skills/a11y-fixer/SKILL.md` is the fixing counterpart: it consumes `mitigations.md` work orders and applies minimal, semantics-first patches with the anti-fix pitfalls as binding rules.
+
+Its core instruction block is **automatically optimizable**: because this tool provides a deterministic 0-100 score, the skill's prompt can be treated as a program and improved by measurement instead of hand-tuning. `optimizer/optimize.py` runs a [DSPy](https://github.com/stanfordnlp/dspy) GEPA loop — candidate instructions fix broken fixture pages, a11y-eval scores each fix, the evaluator's findings feed GEPA's reflection, and a feature-preservation guard zeroes any candidate that "fixes" by deleting content. The winner is spliced back into the skill between managed markers.
+
+```bash
+python3 optimizer/optimize.py --dry-run                    # verify the loop, zero LM calls (runs in CI)
+pip install -r optimizer/requirements.txt                  # dspy, for real runs
+python3 optimizer/optimize.py --auto light --apply         # optimize on the fixtures
+python3 optimizer/optimize.py --auto light --page snapshots/checkout.html --apply   # specialize for YOUR repo
+```
+
+See **[docs/skill-optimization.md](docs/skill-optimization.md)** for how the loop works, costs, and bring-your-own-repo training. `agents/skill-optimizer.md` is an agent that runs the whole flow (baseline → snapshot → optimize → prove the delta) for a given repo.
+
 ## Development
 
 ```bash
