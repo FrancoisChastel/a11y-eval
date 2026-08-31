@@ -58,12 +58,36 @@ jobs:
             if (n !== 5) { console.error('expected 5 static findings, got', n); process.exit(1); }
           "
 
-      - name: Dogfood — the review UI must pass its own evaluator
+      - name: Dogfood — the review UI must pass its own evaluator with zero suspects
         run: |
           node src/cli.ts --url /tmp/r-crawl/review.html --out /tmp/r-dogfood
           node -e "
             const r = require('/tmp/r-dogfood/report.json');
             if (r.verdict !== 'pass') { console.error('review.html failed its own evaluation:', JSON.stringify(r.totals)); process.exit(1); }
+            const suspects = r.findings.filter(f => f.confidence === 'suspect');
+            if (suspects.length > 0) { console.error('review.html raised suspects:', suspects.map(s => s.ruleId)); process.exit(1); }
+          "
+
+      - name: Wave-1 engines + interact probes detect the planted wave1 violations
+        run: |
+          node src/cli.ts --url test-fixtures/wave1.html --interact --out /tmp/r-wave1 || true
+          node -e "
+            const r = require('/tmp/r-wave1/report.json');
+            const rules = new Set(r.findings.map(f => f.ruleId));
+            const expected = ['on-focus-context-change','slider-keyboard-inoperable','hover-content-not-dismissible','focus-order-suspect','sensory-instruction-suspect','lang-of-parts-suspect','no-caption-track','target-size-suspect'];
+            for (const rule of expected) if (!rules.has(rule)) { console.error('missing rule:', rule); process.exit(1); }
+            if (!r.evidence || r.evidence.length === 0) { console.error('expected evidence packets'); process.exit(1); }
+            if (r.verdict !== 'fail') { console.error('expected fail verdict'); process.exit(1); }
+          "
+
+      - name: Suspects gate only under --strict
+        run: |
+          node src/cli.ts --url test-fixtures/wave1.html --strict --out /tmp/r-strict || true
+          node -e "
+            const lax = require('/tmp/r-wave1/report.json');
+            const strict = require('/tmp/r-strict/report.json');
+            if (!(strict.score < lax.score)) { console.error('strict score must be lower:', strict.score, 'vs', lax.score); process.exit(1); }
+            if (strict.totals.moderate <= lax.totals.moderate) { console.error('strict must count suspect findings'); process.exit(1); }
           "
 
       - name: Integration — merge elevates a manual fail to overall fail (exit 1)

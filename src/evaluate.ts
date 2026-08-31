@@ -1,32 +1,57 @@
-import { readFile } from 'node:fs/promises'
-import { chromium } from 'playwright'
+import { mkdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { chromium, type Page } from 'playwright'
 import { diffAgainstBaseline, fingerprint } from './baseline.ts'
 import { discoverPages } from './crawl.ts'
 import { runAxe } from './engines/axe.ts'
+import { runContentChecks, runHoverProbe } from './engines/content.ts'
+import { runFocusFlowChecks } from './engines/focusFlow.ts'
+import { runTargetSizeCheck } from './engines/geometry.ts'
+import { runInteractProbes } from './engines/interact.ts'
 import { runKeyboardChecks } from './engines/keyboard.ts'
 import { collectSignals } from './engines/signals.ts'
 import { eslintReportToFindings } from './engines/staticMerge.ts'
 import { buildRemediationPlan } from './remediations.ts'
-import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict } from './scoring.ts'
-import type { BaselineDiff, EvaluateOptions, Finding, PageResult, Report } from './types.ts'
+import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict, partitionFindings } from './scoring.ts'
+import type { BaselineDiff, EvaluateOptions, EvidencePacket, Finding, PageResult, Report } from './types.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from './wcag.ts'
 
-export const VERSION = '0.7.0'
+export const VERSION = '0.8.0'
 
 const DEFAULT_MAX_PAGES = 15
 const DEFAULT_MAX_DEPTH = 3
+const MAX_EVIDENCE_SHOTS_PER_PAGE = 10
+
+const captureEvidenceShots = async (page: Page, findings: Finding[], evidenceDir: string, pageIndex: number): Promise<void> => {
+  await mkdir(evidenceDir, { recursive: true })
+  let taken = 0
+  for (const finding of findings) {
+    if (taken >= MAX_EVIDENCE_SHOTS_PER_PAGE) break
+    const selector = finding.targets[0]
+    if (!selector) continue
+    try {
+      const name = `finding-p${pageIndex}-${taken}-${finding.ruleId}.png`
+      await page.locator(selector).first().screenshot({ path: join(evidenceDir, name), timeout: 2_000 })
+      finding.evidence = [...(finding.evidence ?? []), `evidence/${name}`]
+      taken += 1
+    } catch {
+      /* selector not screenshotable — skip */
+    }
+  }
+}
 
 /**
- * The evaluation function. Deterministic input → structured output:
- * takes URLs (http(s):// or file://), optionally crawls same-scope pages first,
- * runs the runtime engines and content-signal detection on every page, merges
- * static findings, diffs against an optional baseline, and returns a Report with
- * severity totals, a bounded score, a verdict, a root-cause remediation plan,
- * and the manual checklist.
+ * The evaluation function. Deterministic input → structured output: crawls if
+ * asked, then runs every engine per page — axe, legacy keyboard checks, target-size
+ * geometry, focus-flow (on-focus/traps/order), content checks (sensory phrases,
+ * language of parts, caption tracks, sliders), hover probes, and opt-in interactive
+ * probes — plus content signals and evidence packets. Violations gate the verdict;
+ * suspects pre-fill the manual review (and gate only under strict).
  */
 export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
   if (options.urls.length === 0) throw new Error('evaluate: at least one URL is required')
   const startedAt = new Date().toISOString()
+  const strict = options.strict ?? false
 
   const staticFindings: Finding[] = [
     ...(options.staticFindings ?? []),
@@ -37,6 +62,7 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
 
   const browser = await chromium.launch()
   const pages: PageResult[] = []
+  const evidence: EvidencePacket[] = []
   let urls = options.urls
   try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
@@ -48,21 +74,41 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
       })
     }
 
-    for (const url of urls) {
+    for (const [pageIndex, url] of urls.entries()) {
       const page = await context.newPage()
       try {
         await page.goto(url, { waitUntil: 'networkidle' })
         const axeResult = await runAxe(page, url)
         const signals = await collectSignals(page)
         const keyboardFindings = await runKeyboardChecks(page, url, options.focusSampleSize)
-        const pageFindings = [...axeResult.findings, ...keyboardFindings]
+        const targetSizeFindings = await runTargetSizeCheck(page, url)
+        const contentResult = await runContentChecks(page, url)
+        const hoverFindings = await runHoverProbe(page, url)
+        const interactFindings = options.interact ? await runInteractProbes(page, url) : []
+        // Fresh load before focus-flow: earlier engines (focus sampling, hover and
+        // interact probes) may have opened dialogs or moved sequential-focus state.
+        await page.goto(url, { waitUntil: 'networkidle' })
+        const focusFlow = await runFocusFlowChecks(page, url)
+
+        const pageFindings = [
+          ...axeResult.findings,
+          ...keyboardFindings,
+          ...targetSizeFindings,
+          ...contentResult.findings,
+          ...hoverFindings,
+          ...interactFindings,
+          ...focusFlow.findings,
+        ]
+        if (options.evidenceDir) await captureEvidenceShots(page, pageFindings, options.evidenceDir, pageIndex)
+
+        evidence.push(...contentResult.evidence, focusFlow.tabOrder)
         pages.push({
           url,
           findings: pageFindings,
           passes: axeResult.passes,
           incomplete: axeResult.incomplete,
           signals,
-          score: computeScore(pageFindings),
+          score: computeScore(partitionFindings(pageFindings, strict).gating),
         })
       } finally {
         await page.close()
@@ -86,7 +132,8 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
     }
   }
 
-  const totals = computeTotals(findings)
+  const { gating } = partitionFindings(findings, strict)
+  const totals = computeTotals(gating)
 
   return {
     tool: 'a11y-eval',
@@ -98,12 +145,14 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
     pages,
     findings,
     totals,
-    score: computeScore(findings),
-    scoreBreakdown: computeScoreBreakdown(findings),
+    score: computeScore(gating),
+    scoreBreakdown: computeScoreBreakdown(gating),
     verdict: computeVerdict(totals),
     manualChecklist: MANUAL_CHECKLIST,
     coverageNote: COVERAGE_NOTE,
-    remediationPlan: buildRemediationPlan(findings),
+    remediationPlan: buildRemediationPlan(gating),
     baselineDiff,
+    evidence,
+    strict,
   }
 }

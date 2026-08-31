@@ -49,6 +49,46 @@ const CATALOG: Record<string, Remediation> = {
       'Do not "fix" with a smaller root font-size; text must stay resizable.',
     ],
   },
+  'on-focus-context-change': {
+    summary: 'Move the action from focus to activation — focus must never change context.',
+    steps: [
+      'Delete onfocus/focus-event handlers that open dialogs, move focus, or navigate.',
+      'Trigger the behavior from an explicit activation instead (click/Enter on a button).',
+    ],
+    effort: 'small',
+    pitfalls: ['Do not swap onfocus for onmouseover — pointer-triggered context changes have the same problem for keyboard users.'],
+  },
+  'on-input-context-change': {
+    summary: 'Changing a value must not submit or navigate — require an explicit action.',
+    steps: [
+      'Remove auto-submit/navigation from change handlers on selects, radios, and checkboxes.',
+      'Add an explicit "Apply"/"Go" button, or warn users beforehand that changing the setting navigates.',
+    ],
+    effort: 'small',
+    pitfalls: ['A debounce does not fix this — the surprise is the navigation itself, not its timing.'],
+  },
+  'hover-content-not-dismissible': {
+    summary: 'Content shown on hover/focus must dismiss on Escape without moving the pointer.',
+    steps: [
+      'Add a keydown handler: Escape hides the tooltip/popover while the trigger keeps focus.',
+      'Ensure the revealed content also stays visible while the pointer moves onto it.',
+    ],
+    example: {
+      bad: "el.onmouseenter = () => tip.classList.add('show')",
+      good: "el.onmouseenter = () => tip.classList.add('show')\ndocument.addEventListener('keydown', (e) => { if (e.key === 'Escape') tip.classList.remove('show') })",
+    },
+    effort: 'small',
+    pitfalls: ['Hiding only on mouseleave is the bug, not the fix — Escape must work without pointer movement.'],
+  },
+  'slider-keyboard-inoperable': {
+    summary: 'Give the custom slider keyboard support — or replace it with <input type="range">.',
+    steps: [
+      'Prefer the native <input type="range"> (keyboard, roles, and states for free).',
+      'If custom: handle ArrowLeft/Right/Home/End, update aria-valuenow, and keep tabindex="0".',
+    ],
+    effort: 'medium',
+    pitfalls: ['aria-valuenow updated only on drag leaves keyboard users with a slider that announces but never moves.'],
+  },
   // ---- high-frequency axe rules ----
   'image-alt': {
     summary: 'Give every informative image a meaningful alt; mark decorative ones empty.',

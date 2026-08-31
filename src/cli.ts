@@ -2,6 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { adjudicate, DEFAULT_ADJUDICATION_MODEL } from './engines/adjudicate.ts'
 import { evaluate } from './evaluate.ts'
 import { mergeManualReview } from './merge.ts'
 import { renderMitigations } from './mitigations.ts'
@@ -34,6 +35,10 @@ Evaluate options:
   --static-report <path> Merge an existing ESLint JSON report instead of scanning.
   --baseline <path>      Previous report.json to diff against (new/fixed/persisting) and
                          to carry its manual review forward into the review UI.
+  --strict               Promote machine-flagged suspects into scoring and the verdict gate.
+  --interact             Run state-changing probes (change inputs, open dialogs). STAGING ONLY.
+  --llm [model]          Adjudicate the manual checklist with an LLM (needs ANTHROPIC_API_KEY;
+                         default model ${DEFAULT_ADJUDICATION_MODEL}) and auto-merge the result.
   --out <dir>            Output directory (default: a11y-report).
                          Writes report.json + report.md + review.html.
   --json                 Print the JSON report to stdout.
@@ -60,6 +65,9 @@ manual fail after merge), 2 = usage/runtime error.`
 
 interface CliArgs {
   urls: string[]
+  strict: boolean
+  interact: boolean
+  llm?: string
   repo?: string
   startCmd?: string
   port?: number
@@ -76,7 +84,7 @@ interface CliArgs {
 }
 
 const parseArgs = (argv: string[]): CliArgs => {
-  const args: CliArgs = { urls: [], noStatic: false, reportDir: 'a11y-report', json: false }
+  const args: CliArgs = { urls: [], strict: false, interact: false, noStatic: false, reportDir: 'a11y-report', json: false }
   const next = (i: number, flag: string): string => {
     const value = argv[i]
     if (value === undefined) throw new Error(`${flag} requires a value`)
@@ -101,6 +109,12 @@ const parseArgs = (argv: string[]): CliArgs => {
     else if (arg === '--no-static') args.noStatic = true
     else if (arg === '--static-report') args.staticReportPath = next(++i, '--static-report')
     else if (arg === '--baseline') args.baselinePath = resolve(next(++i, '--baseline'))
+    else if (arg === '--strict') args.strict = true
+    else if (arg === '--interact') args.interact = true
+    else if (arg === '--llm') {
+      const peek = argv[i + 1]
+      args.llm = peek && !peek.startsWith('-') ? argv[++i] : DEFAULT_ADJUDICATION_MODEL
+    }
     else if (arg === '--manual') args.manualPath = resolve(next(++i, '--manual'))
     else if (arg === '--report') args.reportDir = next(++i, '--report')
     else if (arg === '--out') args.outDir = next(++i, '--out')
@@ -219,6 +233,10 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
     const argvTail = process.argv.slice(2).filter((a, i, all) => a !== '--baseline' && all[i - 1] !== '--baseline')
     meta.command = ['node src/cli.ts', ...argvTail].join(' ')
 
+    if (args.interact) {
+      console.error('WARNING: --interact runs state-changing probes (changing inputs, opening dialogs). Staging/fixtures only — never production.')
+    }
+    const outDirEarly = args.outDir ?? args.reportDir
     const report = await evaluate({
       urls: args.urls,
       crawl: args.crawl ?? false,
@@ -227,6 +245,9 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
       staticReportPath: args.staticReportPath,
       staticFindings,
       baselinePath: args.baselinePath,
+      strict: args.strict,
+      interact: args.interact,
+      evidenceDir: join(resolve(outDirEarly), 'evidence'),
       meta,
     })
 
@@ -251,6 +272,22 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
     await writeFile(join(outDir, 'report.md'), renderMarkdown(report))
     await writeFile(join(outDir, 'mitigations.md'), renderMitigations(report))
     await writeFile(join(outDir, 'review.html'), renderReviewHtml(report, { served: false, manual: priorManual }))
+
+    if (args.llm) {
+      console.error(`LLM adjudication with ${args.llm}…`)
+      const review = await adjudicate(report, args.llm)
+      const merged = mergeManualReview(report, review)
+      await writeFile(join(outDir, 'manual-review.json'), JSON.stringify(review, null, 2))
+      await writeFile(join(outDir, 'final-report.json'), JSON.stringify(merged, null, 2))
+      await writeFile(join(outDir, 'final-report.md'), renderMarkdown(merged))
+      await writeFile(join(outDir, 'mitigations.md'), renderMitigations(merged))
+      printSummary(merged, outDir, [`LLM-adjudicated by ${args.llm} — dispositions are agent provenance, not human sign-off`])
+      console.log(
+        `overall=${merged.overall} score=${merged.score} verdict=${merged.verdict} pages=${merged.pages.length}`,
+      )
+      process.exitCode = merged.overall === 'fail' ? 1 : 0
+      return
+    }
 
     if (args.json) {
       console.log(JSON.stringify(report, null, 2))

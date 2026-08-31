@@ -112,6 +112,18 @@ const report = await evaluate({ urls: ['http://localhost:3000'], crawl: true, ma
 4. only after both: report "no known violations; manual criteria reviewed" — never "compliant"
 ```
 
+## How much of the manual checklist is automated?
+
+The 16 criteria automation "cannot verify" are not one problem but three — and two of them yield:
+
+| Tier | Criteria | What happens |
+|------|----------|--------------|
+| **Checked** (violations) | 3.2.1 on-focus context changes · 1.4.13 Esc-dismissability of detected tooltips · keyboard-inoperable custom sliders (2.5.7/2.1.1) · with `--interact`: 3.2.2 on-input navigation, dialog Escape traps (2.1.2) | Deterministic findings, gate the verdict |
+| **Suspects** (confirm, don't hunt) | 2.5.8 target-size geometry (spacing + inline exceptions computed, labels unioned) · 2.4.3 tab-order upward jumps · 2.1.2 Tab-cycle stalls · 1.3.3 sensory-phrase lexicon · 3.1.2 offline language detection (franc) · 1.2.2 missing caption tracks | Pre-fill the review UI with quotes/screenshots; **never gate the verdict** unless `--strict` — false positives can't break CI trust |
+| **Evidence + judgment** | 2.4.6 headings · 3.3.2 label adequacy · 1.4.1 color use · 3.3.3/3.3.7 flows · 1.2.5 media accuracy | Evidence packets collected (headings, labels+controls, tab-order trace, media inventory); judged by a human in the review UI, the evaluator skill, or `--llm` |
+
+`--llm [model]` (needs `ANTHROPIC_API_KEY`) adjudicates the judgment criteria from the evidence packets and auto-merges the result as reviewer `llm:<model>` — low-confidence verdicts become `needs-expert`, provenance is preserved, and an LLM disposition is never silently equivalent to human sign-off. `--interact` enables the state-changing probes (staging only). `data-a11y-eval-ignore` on an element excludes its text from the sensory/language checks — for pages quoting arbitrary content (the review UI uses it on itself).
+
 ## Human review UI
 
 Every evaluation writes `review.html` next to the report — a self-contained, dependency-free page where a human reviewer completes the manual half of the evaluation:

@@ -3,6 +3,23 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.8.0] - 2026-08-31
+
+### Added
+
+- **Suspect confidence tier**: machine-flagged candidates (`confidence: "suspect"`) pre-fill the review UI with quotes and screenshots but never gate the verdict — unless **`--strict`** promotes them. False positives can't break CI trust.
+- **Wave-1 deterministic engines** shrinking the manual checklist: target-size geometry with spacing/inline/UA exceptions and label unions (2.5.8), on-focus context-change detection (3.2.1, violations), Tab-cycle trap and tab-order upward-jump detection (2.1.2/2.4.3), sensory-phrase lexicon (1.3.3), offline language detection via franc with a fit-gap guard (3.1.2), caption-track presence (1.2.2), custom-slider keyboard operability (2.5.7/2.1.1, violations), and an Esc-dismissability hover probe (1.4.13, violations).
+- **Evidence packets** (`report.evidence`): headings, labels with their controls, media inventory, and the full tab-order trace — rendered per criterion in the review UI alongside suspects; suspect element screenshots captured to `evidence/`.
+- **`--llm [model]` adjudication**: judgment criteria dispositioned from the evidence packets via the Anthropic API (no SDK), auto-merged as reviewer `llm:<model>`; low-confidence → needs-expert. Zero-signal criteria resolve mechanically as justified N/A.
+- **`--interact` probes** (staging only, loud warning): on-input navigation detection (3.2.2) and dialog Escape-trap probing (2.1.2).
+- `data-a11y-eval-ignore` attribute excludes an element's text from sensory/language checks; the review UI applies it to its own quoting sections.
+- `test-fixtures/wave1.html` exercising every new check; CI asserts all planted rules fire, strict-mode gating semantics, and that the dogfooded review UI stays at zero suspects.
+- Remediation catalog entries for the new violation rules; checklist items now carry an `automation` tier (`checked`/`suspects`/`evidence`/`none`).
+
+### Fixed
+
+- Native date/time inputs' internal focus segments no longer misread as keyboard traps; default-sized text inputs exempted from target-size (UA-determined size exception).
+
 ## [0.7.0] - 2026-08-31
 
 ### Added

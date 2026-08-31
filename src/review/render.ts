@@ -37,9 +37,12 @@ ${css}
 <body>
 <header class="app" id="app-header"></header>
 <main>
-  <section id="summary" aria-label="Automated results"></section>
-  <section id="plan" aria-label="Recommended fixes"></section>
-  <section id="checklist" aria-label="Manual review checklist"></section>
+  <!-- data-a11y-eval-ignore: these sections quote arbitrary evaluated-page content and
+       review procedures; excluding them from text-level checks (sensory phrases,
+       language detection) prevents the tool flagging its own quotations. -->
+  <section id="summary" aria-label="Automated results" data-a11y-eval-ignore></section>
+  <section id="plan" aria-label="Recommended fixes" data-a11y-eval-ignore></section>
+  <section id="checklist" aria-label="Manual review checklist" data-a11y-eval-ignore></section>
 </main>
 <footer class="app" id="app-footer"></footer>
 <script type="application/json" id="a11y-data">${payload}</script>

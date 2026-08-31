@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wave 1 fixture — deterministic manual-check violations</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1rem; color: #1a1a1a; max-width: 40rem; }
+    :focus-visible { outline: 3px solid #2a4bd7; outline-offset: 2px; }
+    .stack a { display: block; height: 18px; overflow: hidden; }
+    #fake-slider { width: 200px; height: 8px; background: #ccc; display: block; }
+    #tip { display: none; position: absolute; background: #1a1a1a; color: #fff; padding: 4px 8px; }
+    .hover-trigger:hover + #tip, #tip.show { display: block; }
+    [role="dialog"] { border: 2px solid #1a1a1a; padding: 1rem; background: #fff; }
+    [hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Wave 1 fixture</h1>
+
+    <p>To continue, click the green button on the right. When you hear the tone, speak your name.</p>
+
+    <p>Les données personnelles collectées par ce service sont traitées conformément au règlement général sur la protection des données et ne seront jamais transmises à des tiers sans votre consentement explicite.</p>
+
+    <section aria-label="Stacked tiny targets">
+      <h2>Downloads</h2>
+      <div class="stack">
+        <a href="#a">Quarterly report</a>
+        <a href="#b">Annual summary</a>
+        <a href="#c">Budget sheet</a>
+      </div>
+    </section>
+
+    <section aria-label="Focus order">
+      <h2>Out-of-order form</h2>
+      <label for="f1">First field</label>
+      <input id="f1" tabindex="3" />
+      <label for="f2">Second field</label>
+      <input id="f2" tabindex="1" />
+      <label for="f3">Third field</label>
+      <input id="f3" tabindex="2" />
+    </section>
+
+    <section aria-label="On focus">
+      <h2>Surprise on focus</h2>
+      <input id="surprise" aria-label="Focusing me opens a dialog" onfocus="document.getElementById('popup').hidden = false" />
+      <div id="popup" role="dialog" aria-label="Surprise" hidden><p>A dialog appeared because you focused an input.</p></div>
+    </section>
+
+    <section aria-label="Slider">
+      <h2>Volume</h2>
+      <div id="fake-slider" role="slider" tabindex="0" aria-label="Volume" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
+    </section>
+
+    <section aria-label="Tooltip">
+      <h2>Help</h2>
+      <button type="button" class="hover-trigger" aria-describedby="tip"
+        onmouseenter="document.getElementById('tip').classList.add('show')">Pricing details</button>
+      <div id="tip" role="tooltip">Prices exclude VAT and shipping. No Escape handler dismisses me.</div>
+    </section>
+
+    <section aria-label="Media">
+      <h2>Intro video</h2>
+      <video src="intro.mp4" controls width="320" height="180" aria-label="Product introduction video"></video>
+    </section>
+  </main>
+</body>
+</html>

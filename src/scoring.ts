@@ -1,5 +1,17 @@
 import type { Engine, Finding, Impact, ScoreDeduction, Verdict } from './types.ts'
 
+/**
+ * Splits findings into gating (affect score/verdict) and suspects (machine-flagged,
+ * pre-fill the review UI). Under strict mode, suspects gate too.
+ */
+export const partitionFindings = (findings: Finding[], strict = false): { gating: Finding[]; suspects: Finding[] } => {
+  if (strict) return { gating: findings, suspects: [] }
+  const gating: Finding[] = []
+  const suspects: Finding[] = []
+  for (const f of findings) (f.confidence === 'suspect' ? suspects : gating).push(f)
+  return { gating, suspects }
+}
+
 const IMPACT_WEIGHT: Record<Impact, number> = {
   critical: 15,
   serious: 10,

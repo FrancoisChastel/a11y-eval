@@ -97,6 +97,15 @@ Also re-check any axe `incomplete` items on pages where the count is non-zero (`
 
 **Use the content signals.** `pages[].signals` counts media, form controls, drag affordances, hover-revealed content, foreign-language parts, and iframes per page. A criterion whose gating signal is 0 across all pages may be dispositioned `not-applicable` with the signal as evidence ("no media detected across N pages"). A criterion with signals present must never be marked N/A — the signals name the exact pages to inspect.
 
+**Start from the machine's work, not from scratch.** The engines already automated much of this checklist:
+
+- **Suspects** (`findings[].confidence === "suspect"`): machine-flagged candidates for 2.5.8 (target-size geometry with spacing/inline exceptions), 2.4.3 (tab-order upward jumps), 2.1.2 (Tab-cycle stalls), 1.3.3 (sensory phrases, quoted), 3.1.2 (foreign-language blocks), 1.2.2 (videos without caption tracks). Your job on these is **confirm or dismiss with evidence**, not hunt. Suspects do not gate the verdict (unless the run used `--strict`) — your confirmation is what turns them into failures.
+- **Already checked as violations**: 3.2.1 (focus-triggered dialogs/navigation), 1.4.13 Esc-dismissability of detected tooltips, keyboard-inoperable custom sliders (2.5.7/2.1.1). Do not re-test what a violation already proves; spot-check the residue (e.g. hover content the probe could not detect).
+- **Evidence packets** (`report.evidence`): collected headings (2.4.6), labels with their controls (3.3.2), media inventory, and the full tab-order trace — judge from these before opening pages.
+- With `--interact` (staging only) the run also probed on-input context changes (3.2.2) and dialog Escape-dismissal.
+- `--llm` runs a machine adjudication of the judgment criteria and auto-merges it as reviewer `llm:<model>` — treat those dispositions as a prior to verify, never as human sign-off; anything `needs-expert` is yours.
+- `data-a11y-eval-ignore` on an element excludes its text from the sensory/language checks — for pages that quote arbitrary content.
+
 Record manual findings in the same shape as tool findings, with `engine: "agent"` and your evidence in `description` — downstream fixers then consume one uniform list.
 
 **Working with a human reviewer instead?** Every evaluation writes `review.html` next to the report — a self-contained page where a human walks the same checklist (signal-guarded N/A, evidence fields, optional AT/browser feedback). `node src/cli.ts review --report <dir>` serves it with autosave and evidence screenshots; `node src/cli.ts merge --report <dir> --manual manual-review.json` merges their dispositions the same way yours are merged. Do not duplicate a human's manual pass — merge it.

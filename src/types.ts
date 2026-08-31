@@ -19,7 +19,7 @@ export interface ContentSignals {
 
 export type ManualStatus = 'pass' | 'fail' | 'needs-expert' | 'not-applicable'
 
-export type ReviewMethod = 'keyboard' | 'screen-reader' | 'visual' | 'code-read' | 'signal-based'
+export type ReviewMethod = 'keyboard' | 'screen-reader' | 'visual' | 'code-read' | 'signal-based' | 'llm'
 
 export interface ManualReviewItem {
   sc: string
@@ -103,6 +103,29 @@ export interface Finding {
   html?: string
   /** Set when a baseline diff ran: whether this finding is new or was already present. */
   baselineStatus?: BaselineStatus
+  /**
+   * 'violation' (default): certain — gates verdict and score.
+   * 'suspect': machine-flagged, needs confirmation — pre-fills the review UI and only
+   * gates under --strict. Keeps false positives from breaking CI trust.
+   */
+  confidence?: FindingConfidence
+  /** Evidence artifact paths (screenshots) captured for this finding. */
+  evidence?: string[]
+}
+
+export type FindingConfidence = 'violation' | 'suspect'
+
+/** Structured evidence gathered for a manual criterion, consumable by humans and LLM adjudication. */
+export interface EvidencePacket {
+  sc: string
+  /** What was collected: e.g. 'headings', 'labels', 'phrases', 'tab-order', 'media', 'hover' */
+  kind: string
+  items: {
+    page: string
+    text?: string
+    selector?: string
+    screenshot?: string
+  }[]
 }
 
 export interface PageResult {
@@ -126,6 +149,8 @@ export interface ManualCheckItem {
   how: string
   /** Which content signal gates applicability; null = always review, never auto-N/A. */
   signal: keyof ContentSignals | null
+  /** How far machines take this criterion: checks emit findings/suspects, evidence packets, or nothing. */
+  automation: 'checked' | 'suspects' | 'evidence' | 'none'
 }
 
 export interface ReportMeta {
@@ -169,6 +194,10 @@ export interface Report {
   overall?: OverallVerdict
   /** SC dispositioned without evidence — reported, not hidden. */
   undocumentedDispositions?: string[]
+  /** Structured evidence for manual criteria (Wave 2), consumed by the review UI and LLM adjudication. */
+  evidence?: EvidencePacket[]
+  /** True when --strict promoted suspects into the verdict gate. */
+  strict?: boolean
 }
 
 export interface EvaluateOptions {
@@ -186,5 +215,11 @@ export interface EvaluateOptions {
   baselinePath?: string
   /** Max focusable elements to test for visible focus per page. */
   focusSampleSize?: number
+  /** Promote suspect findings into scoring and the verdict gate. */
+  strict?: boolean
+  /** Run state-changing probes (form input changes, invalid submissions, dialog opens). Staging only. */
+  interact?: boolean
+  /** Directory where evidence screenshots are written (enables screenshot capture). */
+  evidenceDir?: string
   meta?: ReportMeta
 }

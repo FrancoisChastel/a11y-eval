@@ -30,12 +30,14 @@ const atAGlance = (report: Report): string[] => {
     : report.manualChecklist.every((c) => report.manualReview?.items.some((i) => i.sc === c.sc))
       ? `complete (${report.manualReview.items.length} criteria)`
       : `incomplete (${report.manualReview.items.length}/${report.manualChecklist.length} criteria)`
+  const suspectCount = report.findings.filter((f) => f.confidence === 'suspect').length
   const rows: [string, string][] = [
-    ['Result', report.overall ? `${report.overall} (automated verdict: ${report.verdict})` : report.verdict],
+    ['Result', (report.overall ? `${report.overall} (automated verdict: ${report.verdict})` : report.verdict) + (report.strict ? ' — strict mode: suspects gate' : '')],
     ['Score', `${report.score}/100 (progress metric — gate on verdict, not score)`],
     ['Pages', `${report.pages.length}${report.meta?.crawled ? ` (crawled from ${report.meta.seeds?.length ?? 1} seed(s))` : ''}`],
     ['Engines', enginesRan.join(' · ') + (engines.has('human') ? ' · human review' : '') + (engines.has('agent') ? ' · agent review' : '')],
     ['Fix groups', `${(report.remediationPlan ?? []).length} — full agent work order in mitigations.md`],
+    ['Suspects', suspectCount === 0 ? 'none' : `${suspectCount} machine-flagged, pre-filled in review.html${report.strict ? ' (gating: strict)' : ' (not gating)'}`],
     ['Manual review', manualState],
   ]
   if (report.baselineDiff) {
@@ -88,6 +90,11 @@ const gaps = (report: Report): string[] => {
     }
     const experts = report.manualReview.items.filter((i) => i.status === 'needs-expert')
     if (experts.length > 0) items.push(`Deferred to a human specialist: ${experts.map((i) => i.sc).join(', ')}.`)
+  }
+  const suspects = report.findings.filter((f) => f.confidence === 'suspect')
+  if (suspects.length > 0 && !report.strict) {
+    const scs = [...new Set(suspects.flatMap((f) => f.wcag))].join(', ')
+    items.push(`${suspects.length} machine-flagged suspect(s) (${scs}) are not counted in the verdict — confirm or dismiss them in the review.`)
   }
   if (report.meta?.crawled) {
     items.push('Only crawl-reachable pages were evaluated — SPA-only routes, auth-gated pages, and form-flow steps need explicit --url seeds.')
@@ -170,7 +177,8 @@ export const renderMarkdown = (report: Report): string => {
     if (page.findings.length > 0) {
       lines.push(`| Impact | Rule | WCAG | Target | Description |`, `|---|---|---|---|---|`)
       for (const f of sortedFindings(page.findings)) {
-        const impact = f.baselineStatus ? `${f.impact} (${f.baselineStatus})` : f.impact
+        let impact = f.confidence === 'suspect' ? `${f.impact} suspect` : f.impact
+        if (f.baselineStatus) impact += ` (${f.baselineStatus})`
         lines.push(`| ${impact} | ${f.ruleId} | ${f.wcag.join(', ') || '—'} | \`${cell(f.targets[0] ?? '')}\` | ${cell(f.description)} |`)
       }
       lines.push('')

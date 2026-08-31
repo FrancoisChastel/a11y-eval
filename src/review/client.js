@@ -155,7 +155,7 @@ const renderSummary = () => {
     if (page.findings.length === 0) continue
     const rows = page.findings.map((f) =>
       el('tr', {},
-        el('td', {}, el('span', { class: `badge ${f.impact}`, text: f.impact }), f.baselineStatus ? el('span', { text: ` ${f.baselineStatus}` }) : null),
+        el('td', {}, el('span', { class: `badge ${f.impact}`, text: f.confidence === 'suspect' ? `${f.impact} suspect` : f.impact }), f.baselineStatus ? el('span', { text: ` ${f.baselineStatus}` }) : null),
         el('td', { text: `${f.ruleId} (${f.wcag.join(', ') || 'best practice'})` }),
         el('td', {}, el('code', { text: f.targets[0] || '' })),
         el('td', {}, el('span', { text: f.description + ' ' }), f.helpUrl ? el('a', { href: f.helpUrl, text: 'Rule docs' }) : null)))
@@ -207,6 +207,9 @@ const updateProgress = () => {
   document.getElementById('progress').textContent = `${done} of ${report.manualChecklist.length} criteria dispositioned.`
 }
 
+const suspectsFor = (sc) => report.findings.filter((f) => f.confidence === 'suspect' && f.wcag.includes(sc))
+const packetsFor = (sc) => (report.evidence || []).filter((p) => p.sc === sc)
+
 const renderCriterion = (criterion) => {
   const current = item(criterion.sc)
   const idBase = `sc-${criterion.sc.replaceAll('.', '-')}`
@@ -215,6 +218,29 @@ const renderCriterion = (criterion) => {
     el('legend', { text: `${criterion.sc} ${criterion.name}` }),
     el('p', { class: 'signal-note', text: criterion.why }),
     el('details', {}, el('summary', { text: 'How to review' }), el('p', { text: criterion.how })))
+
+  // Machine suspects: confirm or dismiss instead of hunting from scratch.
+  const suspects = suspectsFor(criterion.sc)
+  if (suspects.length > 0) {
+    const list = el('ul', {}, ...suspects.map((s) =>
+      el('li', {},
+        el('span', { text: `${s.description} ` }),
+        el('code', { text: s.targets[0] || '' }),
+        el('span', { text: ` on ${s.page}` }),
+        ...(s.evidence || []).map((shot) => el('span', {}, el('br'), el('img', { src: shot, alt: `Screenshot of suspect ${s.ruleId} at ${s.targets[0] || ''}`, style: 'max-width:220px;height:auto;border:1px solid var(--border-soft);border-radius:4px;margin-top:0.25rem' }))))))
+    fieldset.append(el('div', { class: 'warning', role: 'note' },
+      el('p', {}, el('strong', { text: `${suspects.length} machine-flagged suspect(s) — confirm as Fail or dismiss with evidence:` })),
+      list))
+  }
+
+  // Collected evidence packets (headings, labels, tab order…) for judgment criteria.
+  for (const packet of packetsFor(criterion.sc)) {
+    if (packet.items.length === 0) continue
+    fieldset.append(el('details', {},
+      el('summary', { text: `Collected evidence: ${packet.kind} (${packet.items.length})` }),
+      el('ul', {}, ...packet.items.slice(0, 40).map((entry) =>
+        el('li', {}, el('code', { text: entry.selector || '' }), el('span', { text: ` ${entry.text || ''} — ${entry.page}` }))))))
+  }
 
   // Signal context and auto-N/A suggestion
   if (criterion.signal !== null) {
