@@ -97,6 +97,19 @@ const report = await evaluate({ urls: ['http://localhost:3000'], crawl: true, ma
 4. only after both: report "no known violations; manual criteria reviewed" — never "compliant"
 ```
 
+## Agent skill
+
+`skills/a11y-evaluator/SKILL.md` packages this whole process as a harness-agnostic agent skill: CLI invocation recipes, report-contract semantics, per-criterion procedures for the LLM manual review (the 16 automation blind spots), the deliverable template with a mandatory Gaps section, and the anti-claims rules. It follows the [Agent Skills](https://agentskills.io) format (`name` + `description` frontmatter), so any harness that reads `SKILL.md` files can use it:
+
+```bash
+# Claude Code (personal skills)
+cp -r skills/a11y-evaluator ~/.claude/skills/
+
+# Any other harness: inject skills/a11y-evaluator/SKILL.md into the agent's context
+```
+
+`agents/a11y-evaluator.md` is a ready-made Claude Code subagent definition wrapping the skill (`cp agents/a11y-evaluator.md ~/.claude/agents/`).
+
 ## Development
 
 ```bash

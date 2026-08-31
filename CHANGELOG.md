@@ -3,6 +3,14 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.3.0] - 2026-08-31
+
+### Added
+
+- **Agent skill** (`skills/a11y-evaluator/SKILL.md`): harness-agnostic Agent Skills package covering the full evaluation process — CLI recipes, report-contract semantics, per-criterion LLM manual-review procedures for the 16 automation blind spots, deliverable template with mandatory Gaps section, and anti-compliance-claim rules.
+- **Claude Code subagent** (`agents/a11y-evaluator.md`) wrapping the skill.
+- README section documenting skill installation for Claude Code and other harnesses.
+
 ## [0.2.0] - 2026-08-31
 
 ### Added
