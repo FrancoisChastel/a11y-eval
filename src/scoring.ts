@@ -1,4 +1,4 @@
-import type { Finding, Impact, Verdict } from './types.ts'
+import type { Engine, Finding, Impact, ScoreDeduction, Verdict } from './types.ts'
 
 const IMPACT_WEIGHT: Record<Impact, number> = {
   critical: 15,
@@ -16,22 +16,41 @@ export const computeTotals = (findings: Finding[]): Record<Impact, number> => {
   return totals
 }
 
+const IMPACT_RANK: Record<Impact, number> = { critical: 0, serious: 1, moderate: 2, minor: 3 }
+
+/**
+ * The explainable form of the score: per rule, how many instances existed, how
+ * many counted (capped at 5 per rule per page so a systemic issue reads as one
+ * problem, not a zero score), and the points deducted.
+ */
+export const computeScoreBreakdown = (findings: Finding[]): ScoreDeduction[] => {
+  const perPageCounts = new Map<string, number>()
+  const groups = new Map<string, ScoreDeduction>()
+  for (const f of findings) {
+    const groupId = `${f.engine}::${f.ruleId}`
+    const group =
+      groups.get(groupId) ??
+      ({ ruleId: f.ruleId, engine: f.engine as Engine, impact: f.impact, instances: 0, counted: 0, deduction: 0 } satisfies ScoreDeduction)
+    group.instances += 1
+    if (IMPACT_RANK[f.impact] < IMPACT_RANK[group.impact]) group.impact = f.impact
+    const pageKey = `${f.ruleId}::${f.page}`
+    const seen = perPageCounts.get(pageKey) ?? 0
+    if (seen < INSTANCE_CAP) {
+      perPageCounts.set(pageKey, seen + 1)
+      group.counted += 1
+      group.deduction += IMPACT_WEIGHT[f.impact]
+    }
+    groups.set(groupId, group)
+  }
+  return [...groups.values()].sort((a, b) => b.deduction - a.deduction)
+}
+
 /**
  * 100 minus weighted deductions. Repeats of one rule on one page are capped so a
  * single systemic issue (e.g. contrast token) reads as one problem, not a zero score.
  */
-export const computeScore = (findings: Finding[]): number => {
-  const instanceCounts = new Map<string, number>()
-  let deduction = 0
-  for (const f of findings) {
-    const key = `${f.ruleId}::${f.page}`
-    const seen = instanceCounts.get(key) ?? 0
-    if (seen >= INSTANCE_CAP) continue
-    instanceCounts.set(key, seen + 1)
-    deduction += IMPACT_WEIGHT[f.impact]
-  }
-  return Math.max(0, 100 - deduction)
-}
+export const computeScore = (findings: Finding[]): number =>
+  Math.max(0, 100 - computeScoreBreakdown(findings).reduce((sum, d) => sum + d.deduction, 0))
 
 /**
  * Verdict gates on severity, not score: any critical/serious automated violation is

@@ -64,6 +64,18 @@ export interface RemediationGroup {
   recommendation: Remediation
 }
 
+/** One row of the explainable score: what a rule cost and how the cap applied. */
+export interface ScoreDeduction {
+  ruleId: string
+  engine: Engine
+  impact: Impact
+  /** Total instances found. */
+  instances: number
+  /** Instances that counted toward the score (capped at 5 per rule per page). */
+  counted: number
+  deduction: number
+}
+
 export type BaselineStatus = 'new' | 'persisting'
 
 export interface BaselineDiff {
@@ -102,6 +114,8 @@ export interface PageResult {
   incomplete: number
   /** Detected content types, used to gate manual-review applicability. */
   signals?: ContentSignals
+  /** Page-local score (same weighting/cap as the global score, static findings excluded). */
+  score?: number
 }
 
 export interface ManualCheckItem {
@@ -139,6 +153,8 @@ export interface Report {
   findings: Finding[]
   totals: Record<Impact, number>
   score: number
+  /** Per-rule deductions explaining the score. */
+  scoreBreakdown?: ScoreDeduction[]
   verdict: Verdict
   /** Success criteria that automation cannot verify — must be reviewed by a human or a reviewing agent. */
   manualChecklist: ManualCheckItem[]

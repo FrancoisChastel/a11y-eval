@@ -7,11 +7,11 @@ import { runKeyboardChecks } from './engines/keyboard.ts'
 import { collectSignals } from './engines/signals.ts'
 import { eslintReportToFindings } from './engines/staticMerge.ts'
 import { buildRemediationPlan } from './remediations.ts'
-import { computeScore, computeTotals, computeVerdict } from './scoring.ts'
+import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict } from './scoring.ts'
 import type { BaselineDiff, EvaluateOptions, Finding, PageResult, Report } from './types.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from './wcag.ts'
 
-export const VERSION = '0.5.0'
+export const VERSION = '0.6.0'
 
 const DEFAULT_MAX_PAGES = 15
 const DEFAULT_MAX_DEPTH = 3
@@ -55,12 +55,14 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
         const axeResult = await runAxe(page, url)
         const signals = await collectSignals(page)
         const keyboardFindings = await runKeyboardChecks(page, url, options.focusSampleSize)
+        const pageFindings = [...axeResult.findings, ...keyboardFindings]
         pages.push({
           url,
-          findings: [...axeResult.findings, ...keyboardFindings],
+          findings: pageFindings,
           passes: axeResult.passes,
           incomplete: axeResult.incomplete,
           signals,
+          score: computeScore(pageFindings),
         })
       } finally {
         await page.close()
@@ -97,6 +99,7 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
     findings,
     totals,
     score: computeScore(findings),
+    scoreBreakdown: computeScoreBreakdown(findings),
     verdict: computeVerdict(totals),
     manualChecklist: MANUAL_CHECKLIST,
     coverageNote: COVERAGE_NOTE,

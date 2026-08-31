@@ -3,6 +3,14 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.6.0] - 2026-08-31
+
+### Added
+
+- **Explainable score**: `scoreBreakdown` in the report (per-rule instances, the 5-per-rule-per-page cap made visible, points deducted) rendered as a "Score breakdown" table in report.md with a visual score bar; **per-page scores** in `pages[].score`, report.md headings, and the review UI.
+- **CLI summary block**: evaluations and merges now end with a human-readable summary — score with bar, result, severity counts, pages, baseline delta, top fix, output paths — followed by the machine-parseable `key=value` line.
+- CLI demo GIF regenerated for the new output.
+
 ## [0.5.0] - 2026-08-31
 
 ### Added

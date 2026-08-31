@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { computeScore, computeTotals, computeVerdict } from '../src/scoring.ts'
+import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict } from '../src/scoring.ts'
 import type { Finding } from '../src/types.ts'
 
 const finding = (impact: Finding['impact'], ruleId = 'r', page = 'p'): Finding => ({
@@ -49,6 +49,33 @@ describe('computeScore', () => {
   test('never goes below 0', () => {
     const many = Array.from({ length: 50 }, (_, i) => finding('critical', `rule-${i}`))
     expect(computeScore(many)).toBe(0)
+  })
+})
+
+describe('computeScoreBreakdown', () => {
+  test('explains the score: per-rule instances, cap, and deduction sum to 100 - score', () => {
+    const findings = [
+      ...Array.from({ length: 7 }, () => finding('serious', 'color-contrast')),
+      finding('critical', 'image-alt'),
+      finding('minor', 'region'),
+    ]
+    const breakdown = computeScoreBreakdown(findings)
+    const contrast = breakdown.find((d) => d.ruleId === 'color-contrast')
+    expect(contrast).toMatchObject({ instances: 7, counted: 5, deduction: 50 })
+    const totalDeducted = breakdown.reduce((sum, d) => sum + d.deduction, 0)
+    expect(computeScore(findings)).toBe(Math.max(0, 100 - totalDeducted))
+  })
+
+  test('orders deductions largest first and caps per page, not globally', () => {
+    const findings = [
+      finding('serious', 'contrast', 'page-a'),
+      ...Array.from({ length: 6 }, () => finding('serious', 'contrast', 'page-b')),
+      finding('minor', 'region', 'page-a'),
+    ]
+    const breakdown = computeScoreBreakdown(findings)
+    expect(breakdown[0].ruleId).toBe('contrast')
+    // 1 on page-a + capped 5 on page-b = 6 counted
+    expect(breakdown[0].counted).toBe(6)
   })
 })
 

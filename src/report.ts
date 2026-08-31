@@ -7,6 +7,12 @@ const sortedFindings = (findings: Finding[]): Finding[] =>
 
 const cell = (value: string): string => value.replace(/\|/g, '\\|').replaceAll('\n', ' ')
 
+/** Ten-segment visual score bar, e.g. ██████░░░░ for 55. */
+export const scoreBar = (score: number): string => {
+  const filled = Math.round(Math.max(0, Math.min(100, score)) / 10)
+  return '█'.repeat(filled) + '░'.repeat(10 - filled)
+}
+
 const SIGNAL_LABELS: Record<keyof ContentSignals, string> = {
   media: 'Media',
   forms: 'Form controls',
@@ -122,6 +128,23 @@ export const renderMarkdown = (report: Report): string => {
     '',
   ]
 
+  if (report.scoreBreakdown && report.scoreBreakdown.length > 0) {
+    const totalDeducted = report.scoreBreakdown.reduce((sum, d) => sum + d.deduction, 0)
+    lines.push(
+      `## Score breakdown`,
+      '',
+      `${scoreBar(report.score)} **${report.score}/100** — starts at 100; deductions weighted by impact (critical −15, serious −10, moderate −3, minor −1), capped at 5 counted instances per rule per page so one systemic issue reads as one problem.`,
+      '',
+      `| Rule | Engine | Impact | Instances (counted) | Points |`,
+      `|---|---|---|---|---|`,
+      ...report.scoreBreakdown.map(
+        (d) => `| ${d.ruleId} | ${d.engine} | ${d.impact} | ${d.instances}${d.counted < d.instances ? ` (${d.counted} counted)` : ''} | −${d.deduction} |`,
+      ),
+      `| **Total** | | | | **−${Math.min(100, totalDeducted)}** |`,
+      '',
+    )
+  }
+
   if (report.baselineDiff && report.baselineDiff.fixed.length > 0) {
     lines.push(`## Fixed since baseline`, '', ...report.baselineDiff.fixed.map((f) => `- ${f.ruleId} on ${f.page} (\`${f.target}\`)`), '')
   }
@@ -142,7 +165,8 @@ export const renderMarkdown = (report: Report): string => {
 
   lines.push(`## Findings by page`, '')
   for (const page of report.pages) {
-    lines.push(`### ${page.url}`, '', `${page.findings.length} finding(s) · ${page.passes} axe rules passed · ${page.incomplete} incomplete (need review)`, '')
+    const pageScore = page.score !== undefined ? `score ${page.score}/100 · ` : ''
+    lines.push(`### ${page.url}`, '', `${pageScore}${page.findings.length} finding(s) · ${page.passes} axe rules passed · ${page.incomplete} incomplete (need review)`, '')
     if (page.findings.length > 0) {
       lines.push(`| Impact | Rule | WCAG | Target | Description |`, `|---|---|---|---|---|`)
       for (const f of sortedFindings(page.findings)) {

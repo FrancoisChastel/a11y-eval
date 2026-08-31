@@ -150,7 +150,8 @@ const renderSummary = () => {
   main.append(el('p', { text: report.coverageNote }))
 
   for (const page of report.pages) {
-    main.append(el('h3', { text: `${page.url} — ${page.findings.length} finding(s), ${page.incomplete} axe-incomplete` }))
+    const pageScore = page.score === undefined ? '' : ` — score ${page.score}/100`
+    main.append(el('h3', { text: `${page.url}${pageScore} — ${page.findings.length} finding(s), ${page.incomplete} axe-incomplete` }))
     if (page.findings.length === 0) continue
     const rows = page.findings.map((f) =>
       el('tr', {},

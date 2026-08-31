@@ -1,5 +1,5 @@
 import { buildRemediationPlan } from './remediations.ts'
-import { computeScore, computeTotals, computeVerdict } from './scoring.ts'
+import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict } from './scoring.ts'
 import type { Finding, ManualReview, OverallVerdict, Report } from './types.ts'
 
 const manualItemToFinding = (item: ManualReview['items'][number], fallbackPage: string): Finding[] => {
@@ -50,6 +50,7 @@ export const mergeManualReview = (report: Report, manual: ManualReview): Report 
     findings,
     totals,
     score: computeScore(findings),
+    scoreBreakdown: computeScoreBreakdown(findings),
     verdict,
     remediationPlan: buildRemediationPlan(findings),
     manualReview: manual,

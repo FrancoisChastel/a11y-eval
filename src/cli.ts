@@ -8,7 +8,7 @@ import { renderMitigations } from './mitigations.ts'
 import { detectRepo } from './repo/detect.ts'
 import { startServer } from './repo/server.ts'
 import { runStaticScan } from './repo/staticScan.ts'
-import { renderMarkdown } from './report.ts'
+import { renderMarkdown, scoreBar } from './report.ts'
 import { renderReviewHtml } from './review/render.ts'
 import { startReviewServer } from './review/server.ts'
 import type { Finding, ManualReview, Report, ReportMeta } from './types.ts'
@@ -113,6 +113,32 @@ const parseArgs = (argv: string[]): CliArgs => {
 const loadReport = async (reportDir: string): Promise<Report> =>
   JSON.parse(await readFile(join(reportDir, 'report.json'), 'utf8'))
 
+/** Human-readable end-of-run summary; the machine-parseable key=value line follows it. */
+const printSummary = (report: Report, outDir: string, extras: string[] = []): void => {
+  const result = report.overall ?? report.verdict
+  const topFix = report.remediationPlan?.filter((g) => g.engine !== 'human' && g.engine !== 'agent')[0]
+  const width = 62
+  const line = (label: string, value: string): string => `  ${label.padEnd(10)}${value}`
+  const out = [
+    '─'.repeat(width),
+    `  a11y-eval · WCAG 2.2 AA`,
+    line('Score', `${report.score}/100  ${scoreBar(report.score)}`),
+    line(
+      'Result',
+      `${result.toUpperCase().replaceAll('-', ' ')} — ${report.totals.critical} critical · ${report.totals.serious} serious · ${report.totals.moderate} moderate · ${report.totals.minor} minor`,
+    ),
+    line('Pages', `${report.pages.length} evaluated${report.meta?.crawled ? ` (crawled from ${report.meta.seeds?.length ?? 1} seed(s))` : ''}`),
+    ...(report.baselineDiff
+      ? [line('Baseline', `${report.baselineDiff.newCount} new · ${report.baselineDiff.persistingCount} persisting · ${report.baselineDiff.fixedCount} fixed`)]
+      : []),
+    ...(topFix ? [line('Top fix', `[${topFix.impact}] ${topFix.ruleId} — ${topFix.recommendation.summary}`)] : []),
+    ...extras.map((e) => line('', e)),
+    line('Output', `${outDir}/  (report.md · mitigations.md · review.html)`),
+    '─'.repeat(width),
+  ]
+  console.log(out.join('\n'))
+}
+
 const runMerge = async (args: CliArgs): Promise<void> => {
   if (!args.manualPath) throw new Error('merge requires --manual <manual-review.json>')
   const report = await loadReport(args.reportDir)
@@ -124,10 +150,12 @@ const runMerge = async (args: CliArgs): Promise<void> => {
   await writeFile(join(outDir, 'final-report.json'), JSON.stringify(merged, null, 2))
   await writeFile(join(outDir, 'final-report.md'), renderMarkdown(merged))
   await writeFile(join(outDir, 'mitigations.md'), renderMitigations(merged))
+  const manualFails = manual.items.filter((i) => i.status === 'fail').length
+  printSummary(merged, outDir, manualFails > 0 ? [`${manualFails} manual failure(s) merged into the work order`] : [])
   console.log(
     `overall=${merged.overall} score=${merged.score} ` +
       `critical=${merged.totals.critical} serious=${merged.totals.serious} ` +
-      `moderate=${merged.totals.moderate} minor=${merged.totals.minor} → ${join(outDir, 'final-report.md')} (+ mitigations.md)`,
+      `moderate=${merged.totals.moderate} minor=${merged.totals.minor} → ${join(outDir, 'final-report.md')}`,
   )
   process.exitCode = merged.overall === 'fail' ? 1 : 0
 }
@@ -227,13 +255,13 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
     if (args.json) {
       console.log(JSON.stringify(report, null, 2))
     } else {
+      printSummary(report, outDir, staticFindings.length > 0 ? [`${staticFindings.length} static source finding(s) merged`] : [])
       console.log(
         `verdict=${report.verdict} score=${report.score} ` +
           `critical=${report.totals.critical} serious=${report.totals.serious} ` +
           `moderate=${report.totals.moderate} minor=${report.totals.minor} ` +
           `pages=${report.pages.length} static=${staticFindings.length}` +
-          (report.baselineDiff ? ` new=${report.baselineDiff.newCount} fixed=${report.baselineDiff.fixedCount}` : '') +
-          ` → ${join(outDir, 'report.md')} (review UI: ${join(outDir, 'review.html')})`,
+          (report.baselineDiff ? ` new=${report.baselineDiff.newCount} fixed=${report.baselineDiff.fixedCount}` : ''),
       )
     }
     process.exitCode = report.verdict === 'fail' ? 1 : 0
