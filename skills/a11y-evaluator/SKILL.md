@@ -73,6 +73,14 @@ Exit codes: `0` = pass or pass-with-issues, `1` = fail (has critical/serious), `
 
 Walk every entry in `report.json`'s `manualChecklist` against the evaluated pages. Inspect however your harness allows — a browser automation tool, a throwaway Playwright script (the repo has Playwright installed; `node -e` with `chromium.launch()` works), or reading rendered HTML and source templates. Each criterion gets a status: `pass`, `fail`, `needs-human`, or `not-applicable` — **with evidence** (page, element, what you observed). No evidence, no status.
 
+### Judgment principles
+
+<!-- OPTIMIZED-INSTRUCTIONS:START — this block is the optimization target managed by optimizer/optimize.py --target adjudicator; it is also loaded at runtime by --llm adjudication. Manual edits are overwritten by --apply -->
+
+Adjudicate each criterion from the machine-collected evidence, deciding "pass", "fail", or "needs-expert". Be conservative: prefer needs-expert over a guessed pass — a wrong pass ships a barrier, a needs-expert only costs a review. A criterion whose suspects clearly violate its judging rule is a fail; do not soften a demonstrated violation to needs-expert. Judge only from the evidence given — never assume unseen pages compensate. For label and heading adequacy, ask whether a first-time user would know what the section contains or what to enter, including format; generic or ambiguous wording fails. Quote the decisive evidence in every justification.
+
+<!-- OPTIMIZED-INSTRUCTIONS:END -->
+
 How to review each criterion:
 
 | SC | Check | How |

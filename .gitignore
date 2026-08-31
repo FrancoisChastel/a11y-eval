@@ -5,3 +5,5 @@ a11y-report/
 .DS_Store
 video/out/
 video/node_modules/
+optimizer/.venv/
+optimizer/.env

@@ -1,9 +1,35 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { EvidencePacket, Finding, ManualReview, ManualReviewItem, Report } from '../types.ts'
 
 export const DEFAULT_ADJUDICATION_MODEL = 'claude-haiku-4-5-20251001'
 
 /** Criteria the LLM adjudicates; the rest resolve mechanically (signals) or stay needs-expert. */
-const JUDGMENT_SCS = ['1.3.3', '1.4.1', '2.4.3', '2.4.6', '2.5.8', '3.1.2', '3.3.2']
+export const JUDGMENT_SCS = ['1.3.3', '1.4.1', '2.4.3', '2.4.6', '2.5.8', '3.1.2', '3.3.2']
+
+const FALLBACK_JUDGMENT_INSTRUCTIONS =
+  'Adjudicate each criterion from the machine-collected evidence, deciding "pass", "fail", or "needs-expert". Be conservative: prefer needs-expert over a guessed pass. A criterion whose suspects clearly violate its judging rule is a fail. Quote the decisive evidence in every justification.'
+
+const EVALUATOR_SKILL_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'skills', 'a11y-evaluator', 'SKILL.md')
+const MARKER_RE = /<!-- OPTIMIZED-INSTRUCTIONS:START[^>]*-->\n([\s\S]*?)\n<!-- OPTIMIZED-INSTRUCTIONS:END -->/
+
+/**
+ * The judgment instructions live in the evaluator skill between managed markers —
+ * one text drives both the agent skill and --llm adjudication, and the DSPy
+ * optimizer improves it in place. Falls back to a built-in seed when the skill
+ * file is absent (e.g. the tool vendored without skills/).
+ */
+export const loadJudgmentInstructions = (skillPath = EVALUATOR_SKILL_PATH): string => {
+  try {
+    const match = MARKER_RE.exec(readFileSync(skillPath, 'utf8'))
+    const text = match?.[1]?.trim()
+    if (text) return text
+  } catch {
+    /* skill file not present */
+  }
+  return FALLBACK_JUDGMENT_INSTRUCTIONS
+}
 
 export const buildAdjudicationPrompt = (report: Report): string => {
   const suspectsBySc = new Map<string, Finding[]>()
@@ -24,7 +50,9 @@ export const buildAdjudicationPrompt = (report: Report): string => {
     return `### WCAG ${sc} — ${item?.name ?? ''}\nJudging rule: ${item?.how ?? ''}\nMachine suspects:\n${suspects || '  (none)'}\nEvidence:\n${packets || '  (none collected)'}`
   }).join('\n\n')
 
-  return `You are adjudicating WCAG 2.2 AA manual criteria from machine-collected evidence. For each criterion below, decide: "pass" (evidence shows no violation), "fail" (evidence shows a violation), or "needs-expert" (evidence is insufficient or the call is genuinely uncertain). Be conservative: prefer needs-expert over a guessed pass. A criterion with confirmed suspects that clearly violate its judging rule is a fail.
+  return `You are adjudicating WCAG 2.2 AA manual criteria from machine-collected evidence.
+
+${loadJudgmentInstructions()}
 
 ${sections}
 

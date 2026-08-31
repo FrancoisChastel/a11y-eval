@@ -28,11 +28,28 @@ import re
 import sys
 from pathlib import Path
 
+from adjudicator import build_adjudicator_trainset, dry_run as adjudicator_dry_run, score_adjudication
 from metric import score
 from trainset import build_trainset
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILL_PATH = ROOT / "skills" / "a11y-fixer" / "SKILL.md"
+EVALUATOR_SKILL_PATH = ROOT / "skills" / "a11y-evaluator" / "SKILL.md"
+
+
+def load_dotenv() -> None:
+    """Loads optimizer/.env (gitignored) so the API key never has to live in a shell profile."""
+    import os
+
+    env_file = ROOT / "optimizer" / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip("'\""))
 MARKER_RE = re.compile(
     r"(<!-- OPTIMIZED-INSTRUCTIONS:START[^>]*-->\n)(.*?)(\n<!-- OPTIMIZED-INSTRUCTIONS:END -->)", re.S
 )
@@ -71,6 +88,59 @@ def dry_run() -> int:
     ok = fixed_score >= 0.99 and identity_score <= 0.7 and guard_score == 0.0
     print(f"\ndry run {'PASSED' if ok else 'FAILED'}: hand-fixed must reach 1.0, identity must stay low, deletion must score 0.")
     return 0 if ok else 1
+
+
+def optimize_adjudicator(args: argparse.Namespace) -> int:
+    try:
+        import dspy
+    except ImportError:
+        print("dspy is not installed. Run: uv pip install -r optimizer/requirements.txt", file=sys.stderr)
+        return 2
+
+    skill_path = Path(args.skill) if args.skill else EVALUATOR_SKILL_PATH
+    seed = read_seed_instructions(skill_path)
+    print(f"seed judgment instructions: {len(seed)} chars from {skill_path}")
+    print("building adjudicator trainset (one evaluation per fixture)…")
+    examples = build_adjudicator_trainset(ROOT)
+
+    signature = dspy.Signature(
+        {
+            "criteria_context": (str, dspy.InputField(desc="WCAG criteria with judging rules, machine suspects, and collected evidence")),
+            "adjudications_json": (str, dspy.OutputField(desc='JSON array only: [{"sc","status":"pass|fail|needs-expert","confidence":"high|low","evidence"}]')),
+        },
+        seed,
+    )
+    program = dspy.ChainOfThought(signature)
+    dspy.configure(lm=dspy.LM(args.model, max_tokens=8000))
+
+    gold_by_context = {e.criteria_context: e.gold for e in examples}
+
+    def gepa_metric(gold_example, pred, trace=None, pred_name=None, pred_trace=None):
+        gold = gold_by_context[gold_example.criteria_context]
+        value, feedback = score_adjudication(pred.adjudications_json or "", gold)
+        return dspy.Prediction(score=value, feedback=feedback)
+
+    trainset = [dspy.Example(criteria_context=e.criteria_context).with_inputs("criteria_context") for e in examples]
+
+    optimizer = dspy.GEPA(
+        metric=gepa_metric,
+        auto=args.auto,
+        reflection_lm=dspy.LM(args.model, temperature=1.0, max_tokens=8000),
+        track_stats=True,
+    )
+    optimized = optimizer.compile(program, trainset=trainset, valset=trainset)
+
+    instructions = optimized.predictors()[0].signature.instructions
+    out_path = ROOT / "optimizer" / "optimized-judgment-instructions.md"
+    out_path.write_text(instructions, encoding="utf-8")
+    print(f"\noptimized judgment instructions saved to {out_path}")
+
+    if args.apply:
+        write_optimized_instructions(skill_path, instructions)
+        print(f"spliced into {skill_path} — --llm adjudication now uses them at runtime.")
+    else:
+        print("run again with --apply to write them into the evaluator skill.")
+    return 0
 
 
 def optimize(args: argparse.Namespace) -> int:
@@ -129,13 +199,19 @@ def optimize(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--target", default="fixer", choices=["fixer", "adjudicator"], help="which skill to optimize: the a11y-fixer instructions or the evaluator's judgment instructions")
     parser.add_argument("--dry-run", action="store_true", help="exercise the metric with zero LM calls")
-    parser.add_argument("--skill", default=str(SKILL_PATH), help="skill file with OPTIMIZED-INSTRUCTIONS markers")
+    parser.add_argument("--skill", default=None, help="skill file with OPTIMIZED-INSTRUCTIONS markers (default depends on --target)")
     parser.add_argument("--model", default="anthropic/claude-sonnet-5", help="litellm model id for fixing + reflection")
     parser.add_argument("--auto", default="light", choices=["light", "medium", "heavy"], help="GEPA budget")
     parser.add_argument("--page", action="append", default=[], help="extra broken HTML page(s) to train on (repeatable)")
     parser.add_argument("--apply", action="store_true", help="write optimized instructions back into the skill")
     args = parser.parse_args()
+    load_dotenv()
+    if args.target == "adjudicator":
+        return adjudicator_dry_run(ROOT) if args.dry_run else optimize_adjudicator(args)
+    if args.skill is None:
+        args.skill = str(SKILL_PATH)
     return dry_run() if args.dry_run else optimize(args)
 
 

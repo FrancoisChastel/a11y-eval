@@ -1,0 +1,29 @@
+{
+  "_comment": "Ground-truth dispositions for the adjudicator metric. We planted the fixtures' issues, so the correct answers are known. gold = full credit; acceptable = half credit; a 'pass' where gold is 'fail' is the dangerous error (zero + called out in feedback). SCs omitted for a fixture are not scored (e.g. mechanically N/A).",
+  "wave1": {
+    "1.3.3": { "gold": ["fail"], "acceptable": ["needs-expert"] },
+    "1.4.1": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "2.4.3": { "gold": ["fail"], "acceptable": ["needs-expert"] },
+    "2.4.6": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "2.5.8": { "gold": ["fail"], "acceptable": ["needs-expert"] },
+    "3.1.2": { "gold": ["fail"], "acceptable": ["needs-expert"] },
+    "3.3.2": { "gold": ["pass"], "acceptable": ["needs-expert"] }
+  },
+  "site": {
+    "1.3.3": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "1.4.1": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "2.4.3": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "2.4.6": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "2.5.8": { "gold": ["fail"], "acceptable": ["needs-expert"] },
+    "3.1.2": { "gold": ["pass"], "acceptable": ["needs-expert"] }
+  },
+  "accessible-form": {
+    "1.3.3": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "1.4.1": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "2.4.3": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "2.4.6": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "2.5.8": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "3.1.2": { "gold": ["pass"], "acceptable": ["needs-expert"] },
+    "3.3.2": { "gold": ["pass"], "acceptable": ["needs-expert"] }
+  }
+}
