@@ -7,6 +7,16 @@
 
 WCAG 2.2 AA evaluation tool built entirely on open-source components. Point it at a **repo** and/or a **running app**: it detects the framework, statically scans the source, starts the dev server, **crawls** the pages, runs runtime accessibility engines on each, and merges everything into one scored, gateable report. Designed as the **evaluation function** for accessibility agents: deterministic input → structured JSON output.
 
+## Demo
+
+Evaluate a site — crawl, engines, verdict, remediation plan:
+
+![CLI demo: crawling a site, findings summary, remediation plan, and the generated review UI](docs/demo-cli.gif)
+
+Then complete the manual half in the generated review UI — signal-suggested N/A with auto-evidence, per-criterion procedures, evidence capture, live progress:
+
+![Review UI demo: applying a signal-suggested Not applicable with auto-generated evidence, failing 2.4.3 Focus Order with typed evidence, and the progress footer](docs/demo-review-ui.gif)
+
 ## Quick start
 
 ```bash
@@ -149,6 +159,10 @@ node src/cli.ts --url test-fixtures/accessible-form.html             # pass, sco
 node src/cli.ts --repo test-fixtures/mini-app --no-crawl --url test-fixtures/site/page2.html
                                                                         # bundled static scan: 5 jsx-a11y findings
 ```
+
+The unit-test count grows with the suite — `pnpm test` prints the current number (45 as of v0.4.0).
+
+Regenerating the README demo GIFs after UI/CLI changes: `vhs docs/demo-cli.tape` for the terminal demo, and `node docs/record-review-demo.mjs <review.html> out.webm` followed by an ffmpeg palette pass (fps 7, 820px wide, 64 colors) for the review-UI demo.
 
 ## Known limitations
 
