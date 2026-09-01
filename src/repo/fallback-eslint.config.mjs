@@ -1,6 +1,6 @@
 // Bundled a11y ESLint config — fully self-contained (a11y-eval's own eslint,
 // parsers, and plugins), so the static scan never depends on the target repo's
-// lint setup. Covers JS/JSX/TS/TSX (jsx-a11y) and .vue SFCs (vuejs-accessibility).
+// lint setup. Covers React — JSX in .js/.jsx/.mjs/.cjs and TS/TSX — via jsx-a11y, and .vue SFCs via vuejs-accessibility.
 import tsParser from '@typescript-eslint/parser'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import vueA11y from 'eslint-plugin-vuejs-accessibility'
