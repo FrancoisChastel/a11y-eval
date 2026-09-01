@@ -33,7 +33,7 @@ node src/cli.ts --repo /path/to/your-app --url http://localhost:3000 --crawl
 node src/cli.ts --url http://localhost:3000 --crawl
 ```
 
-Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `report.md` (human summary: at-a-glance, top fixes, findings, signals, gaps, next steps), `mitigations.md` (agent-executable fix work order), and `review.html` (human manual-review UI). Exit codes: `0` pass / pass-with-issues, `1` fail (critical or serious violations — CI gate), `2` error.
+Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `report.md` (human summary: at-a-glance, top fixes, findings, signals, gaps, next steps), `mitigations.md` (agent-executable fix work order), `review.html` (human manual-review UI), and `evidence/` (element screenshots). Exit codes: `0` pass / pass-with-issues, `1` fail (critical or serious violations — CI gate), `2` error.
 
 ## What repo mode does
 
@@ -49,20 +49,33 @@ Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `re
 |--------|------|--------|
 | `axe` | [axe-core](https://github.com/dequelabs/axe-core) (MPL-2.0) via `@axe-core/playwright` | WCAG 2.0/2.1/2.2 A+AA automated rules: contrast, names/roles/values, ARIA validity, document structure |
 | `keyboard` | Custom [Playwright](https://github.com/microsoft/playwright) checks | Gaps axe can't see: **2.1.1** click-affordance elements not keyboard-operable, **2.4.7** no visible focus indicator, **1.4.10** horizontal overflow at 320px |
+| `vlm` (opt-in `--vlm`) | Any image-capable LLM via the provider layer | Vision judgments as tiered suspects/observations: alt-text adequacy, color-only meaning (grayscale pairs), focus-order overlays, contrast triage, reflow/hover/label observations, media keyframes |
 | `static` | Bundled [ESLint](https://eslint.org) + [jsx-a11y](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y) + [vuejs-accessibility](https://github.com/vue-a11y/eslint-plugin-vuejs-accessibility) (self-contained; repo's own ESLint merged in when present) | Pre-render source issues in React (JS/JSX/TS/TSX) and Vue SFCs, mapped to `file:line:col` |
 
 ## CLI reference
 
 ```
+# Evaluate (default command)
 --url <url>            Seed page (http(s)://, file://, or local HTML path). Repeatable.
---repo <dir>           Source repo (enables repo mode).
+--repo <dir>           Source repo (enables repo mode: detect, static scan, start, crawl).
 --start-cmd <cmd>      Command to start the app (default: detected dev script).
 --port <n>             App port (default: framework default).
 --crawl / --no-crawl   Toggle page discovery (default: on in repo mode, off otherwise).
 --max-pages <n>        Crawl cap (default 15).      --max-depth <n>  Depth cap (default 3).
---no-static            Skip static scan.
+--no-static            Skip the bundled static scan.
 --static-report <path> Merge an existing ESLint JSON report (eslint -f json).
+--baseline <path>      Previous report.json — classifies findings new/persisting/fixed
+                       and carries its manual review forward into review.html.
+--strict               Promote machine-flagged suspects into scoring and the verdict gate.
+--interact             State-changing probes (change inputs, open dialogs). STAGING ONLY.
+--llm [provider/model] LLM adjudication of the manual checklist, auto-merged (any provider).
+--vlm [provider/model] Vision checks with tiered trust (model must accept images).
 --out <dir>            Output dir (default a11y-report). --json  Print JSON to stdout.
+
+# Subcommands
+review   [--report <dir>] [--port <n>]      Serve the manual-review UI (127.0.0.1 only).
+merge    --report <dir> --manual <file>     Merge a manual review → final report + verdict.
+mitigate [--report <dir>]                   Regenerate mitigations.md (prefers final-report.json).
 ```
 
 Library use:
@@ -77,19 +90,31 @@ const report = await evaluate({ urls: ['http://localhost:3000'], crawl: true, ma
 ```jsonc
 {
   "target": "wcag22aa",
-  "verdict": "fail",              // pass | pass-with-issues | fail
-  "score": 40,                    // 0-100, weighted + instance-capped
+  "verdict": "fail",              // pass | pass-with-issues | fail (suspects excluded unless strict)
+  "overall": "fail",              // only after a manual review is merged: fail | issues | no-known-violations
+  "score": 40,                    // 0-100, weighted + instance-capped; scoreBreakdown itemizes it
   "totals": { "critical": 1, "serious": 3, "moderate": 5, "minor": 0 },
-  "meta": { "repo": "/path", "framework": "vite", "staticScan": "bundled-a11y", "crawled": true, "seeds": ["…"] },
-  "pages": [ /* per-URL findings, axe passes/incomplete counts */ ],
+  "meta": { "repo": "/path", "framework": "vite", "staticScan": "bundled-a11y",
+            "crawled": true, "seeds": ["…"], "command": "node src/cli.ts …",
+            "vlm": "gemini/gemini-2.5-flash", "vlmNote": "…failed checks, if any…" },
+  "pages": [ /* per-URL findings, page score, axe passes/incomplete, content signals */ ],
   "findings": [
     { "engine": "axe", "ruleId": "color-contrast", "impact": "serious", "wcag": ["1.4.3"],
       "page": "http://localhost:3000/", "targets": [".cta"], "html": "<div class=\"cta\">…</div>",
       "helpUrl": "https://dequeuniversity.com/rules/axe/…" },
+    { "engine": "keyboard", "ruleId": "target-size-suspect", "impact": "moderate", "wcag": ["2.5.8"],
+      "confidence": "suspect" },   // machine-flagged: pre-fills the review UI, gates only under --strict
+    { "engine": "vlm", "ruleId": "vlm-alt-quality-suspect", "impact": "serious", "wcag": ["1.1.1"],
+      "confidence": "suspect", "description": "… Proposed alt: \"…\"" },
     { "engine": "static", "ruleId": "jsx-a11y/alt-text", "impact": "moderate", "wcag": [],
       "page": "/app/src/App.tsx", "targets": ["/app/src/App.tsx:5:5"] }
   ],
-  "manualChecklist": [ /* SC automation cannot verify — the agent/human review queue */ ],
+  "scoreBreakdown": [ /* per-rule deductions with the instance cap made visible */ ],
+  "remediationPlan": [ /* root-cause fix groups: steps, examples, pitfalls, effort */ ],
+  "evidence": [ /* per-SC packets: headings, labels, tab-order, media, vlm-observations */ ],
+  "baselineDiff": { "newCount": 1, "persistingCount": 3, "fixedCount": 9, "fixed": [ … ] },
+  "manualReview": { /* merged human/LLM dispositions with evidence and provenance */ },
+  "manualChecklist": [ /* the 16 SC automation cannot fully verify — the review queue */ ],
   "coverageNote": "…"
 }
 ```
@@ -99,6 +124,7 @@ const report = await evaluate({ urls: ['http://localhost:3000'], crawl: true, ma
 - **`verdict` gates on severity, not score.** Any `critical`/`serious` finding ⇒ `fail` (AA blocker). Only `moderate`/`minor` ⇒ `pass-with-issues`.
 - **`pass` is NOT a compliance claim.** Automation covers roughly 30–50% of WCAG. `manualChecklist` lists the criteria (1.4.13, 2.4.3, 2.5.7, 3.2.2, label adequacy, …) that a reviewing agent or human must still check. Never report "WCAG 2.2 AA compliant" from this tool alone.
 - **`score` tracks progress**, not gating: 100 minus impact-weighted deductions (critical 15, serious 10, moderate 3, minor 1), same rule + same page capped at 5 instances so one systemic issue (a bad contrast token) reads as one problem, not a zero.
+- **Suspects never gate by default.** `confidence: "suspect"` findings (geometry, content, and VLM checks) pre-fill the review UI with quotes and screenshots; only `--strict` promotes them into scoring and the verdict.
 - **Static findings are advisory** (`moderate`/`minor`): runtime engines are the source of truth for what reaches the rendered page. A static finding with no runtime counterpart often means the component isn't on a crawled page — worth an agent's attention, not an automatic fix-reject.
 
 ### Suggested agent loop
@@ -195,10 +221,13 @@ pnpm typecheck
 node src/cli.ts --url test-fixtures/site/index.html --crawl          # discovers 3 pages, fails on flawed.html
 node src/cli.ts --url test-fixtures/accessible-form.html             # pass, score 100
 node src/cli.ts --repo test-fixtures/mini-app --no-crawl --url test-fixtures/site/page2.html
-                                                                        # bundled static scan: 5 jsx-a11y findings
+                                                                        # bundled static scan: 8 findings (5 jsx + 3 vue)
+node src/cli.ts --url test-fixtures/wave1.html --interact             # every wave-1 engine + probe fires
+node test-fixtures/mock-llm-server.mjs 4941 &                         # then: full --vlm E2E without any provider
+A11Y_LLM_BASE_URL=http://127.0.0.1:4941/v1 A11Y_LLM_API_KEY=test node src/cli.ts --url test-fixtures/wave1.html --vlm openai-compat/mock-vlm
 ```
 
-The unit-test count grows with the suite — `pnpm test` prints the current number (45 as of v0.4.0).
+The unit-test count grows with the suite — `pnpm test` prints the current number (72 as of v0.11.0).
 
 Regenerating the README demos after UI/CLI changes: the explainer via `cd video && pnpm install && pnpm render` (Remotion — scenes in `video/src/`, terminal transcripts kept verbatim from real runs in `video/src/content.ts`), then an ffmpeg palette pass to GIF (`fps=10,scale=900` + 128-color palettegen/paletteuse → `docs/demo-explainer.gif`) and upload the mp4 as a release asset for the HD link; the review-UI GIF via `node docs/record-review-demo.mjs <review.html> out.webm` + ffmpeg (fps 7, 820px, 64 colors).
 
@@ -209,6 +238,7 @@ Regenerating the README demos after UI/CLI changes: the explainer via `cd video 
 - The reflow check flags overflow, not the SC's exemptions (data tables, maps) — treat `horizontal-overflow-320` as review-required.
 - The crawler follows links, so pages reachable only through form submissions, auth, or JS-only navigation need explicit `--url` seeds (or a Playwright storage state / dev auth bypass).
 - SPA client-side route changes without `<a href>` links are not discovered — seed those routes explicitly.
+- `--vlm` needs an image-capable model and costs per screenshot (≈4–8 calls/page); its verdicts are suspects/observations by design — vision models hallucinate confidently, so nothing a VLM says gates CI or substitutes for human sign-off.
 
 ## Contributing
 

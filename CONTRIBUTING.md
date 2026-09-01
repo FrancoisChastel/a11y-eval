@@ -23,7 +23,12 @@ node src/cli.ts --url test-fixtures/accessible-form.html                 # must 
 node src/cli.ts --url test-fixtures/flawed-form.html                     # must exit 1
 node src/cli.ts --url test-fixtures/site/index.html --crawl              # must discover 3 pages
 node src/cli.ts --repo test-fixtures/mini-app --no-crawl --url test-fixtures/site/page2.html
-                                                                         # must yield 5 static findings
+                                                                         # must yield 8 static findings (5 jsx + 3 vue)
+node src/cli.ts --url test-fixtures/wave1.html --interact                # wave-1 engines + probes fixture
+# --vlm E2E without any provider (CI does the same):
+node test-fixtures/mock-llm-server.mjs 4941 & \
+  A11Y_LLM_BASE_URL=http://127.0.0.1:4941/v1 A11Y_LLM_API_KEY=test \
+  node src/cli.ts --url test-fixtures/wave1.html --vlm openai-compat/mock-vlm
 ```
 
 A good PR:

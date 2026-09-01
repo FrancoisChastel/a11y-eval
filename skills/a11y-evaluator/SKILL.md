@@ -50,7 +50,7 @@ node src/cli.ts --url https://staging.example.com --crawl --out /tmp/a11y
 node src/cli.ts --url http://localhost:3000/checkout --url http://localhost:3000/settings --out /tmp/a11y
 ```
 
-Useful flags: `--max-pages <n>` / `--max-depth <n>` (crawl caps, default 15/3), `--no-crawl`, `--no-static`, `--start-cmd "<cmd>"` and `--port <n>` when detection guesses wrong, `--static-report <eslint.json>` to reuse an existing lint run.
+Useful flags: `--max-pages <n>` / `--max-depth <n>` (crawl caps, default 15/3), `--no-crawl`, `--no-static`, `--start-cmd "<cmd>"` and `--port <n>` when detection guesses wrong, `--static-report <eslint.json>` to reuse an existing lint run, `--baseline <prev report.json>` on re-runs, `--strict` to make suspects gate, `--interact` for state-changing probes (staging only), `--llm [provider/model]` for machine adjudication, `--vlm [provider/model]` for vision checks (image-capable model).
 
 **Seed selection matters.** The crawler only follows real `<a href>` links. Before running, check the repo's router (`grep -r "path:" src/ --include="*.ts*"`, Next `app/`/`pages/` dirs, route tables) and add `--url` seeds for important routes the crawl would miss: SPA-only navigation, auth-gated pages (needs a running logged-in instance or dev bypass), form-flow steps, error/empty states.
 
@@ -65,13 +65,14 @@ Exit codes: `0` = pass or pass-with-issues, `1` = fail (has critical/serious), `
 - `findings[]`: each has `engine`, `ruleId`, `impact`, `wcag` (success criteria), `page`, `targets` (CSS selectors for runtime, `file:line:col` for static), `html` snippet, `helpUrl`.
   - `engine: "axe"` — trust these; false positives are rare. `helpUrl` explains the fix.
   - `engine: "keyboard"` — custom checks: `keyboard-unreachable` (2.1.1), `focus-not-visible` (2.4.7), `horizontal-overflow-320` (1.4.10 — verify it isn't an exempt table/map before reporting).
+  - `engine: "vlm"` — vision suspects (only with `--vlm`): confirm or dismiss like any suspect; alt-quality ones carry a proposed replacement alt.
   - `engine: "static"` — advisory (source-level). If a static finding has no runtime counterpart, the component likely isn't on any crawled page: say so rather than dropping it.
 - `pages[]`: per-URL findings plus axe `passes`/`incomplete` counts. `incomplete` > 0 means axe itself wants human review on that page.
 - `meta`: what actually ran (framework, static-scan mode, crawled seeds). If `meta.staticScan` is `"skipped"`, report that gap.
 
 ## Phase 3 — Manual review (the LLM pass)
 
-Walk every entry in `report.json`'s `manualChecklist` against the evaluated pages. Inspect however your harness allows — a browser automation tool, a throwaway Playwright script (the repo has Playwright installed; `node -e` with `chromium.launch()` works), or reading rendered HTML and source templates. Each criterion gets a status: `pass`, `fail`, `needs-human`, or `not-applicable` — **with evidence** (page, element, what you observed). No evidence, no status.
+Walk every entry in `report.json`'s `manualChecklist` against the evaluated pages. Inspect however your harness allows — a browser automation tool, a throwaway Playwright script (the repo has Playwright installed; `node -e` with `chromium.launch()` works), or reading rendered HTML and source templates. Each criterion gets a status: `pass`, `fail`, `needs-expert`, or `not-applicable` — **with evidence** (page, element, what you observed). No evidence, no status.
 
 ### Judgment principles
 
@@ -85,7 +86,7 @@ How to review each criterion:
 
 | SC | Check | How |
 |----|-------|-----|
-| 1.2.2 / 1.2.5 | Captions / audio description | Find `<video>`, `<audio>`, embeds on evaluated pages. Media without captions/transcript → fail. No media → not-applicable. Accuracy of captions → needs-human. |
+| 1.2.2 / 1.2.5 | Captions / audio description | Find `<video>`, `<audio>`, embeds on evaluated pages. Media without captions/transcript → fail. No media → not-applicable. Accuracy of captions → needs-expert. |
 | 1.3.3 | Sensory characteristics | Search page text and templates for instructions like "click the green button", "the box on the right", "when you hear the tone". Any found → fail. |
 | 1.4.1 | Use of color | Links inside prose distinguished by more than color? Status/chart/required-field meaning carried by text or icon too? Inspect the rendered markup for the state variants. |
 | 1.4.13 | Content on hover/focus | For each tooltip/popover/dropdown: dismissible with Esc? Pointer can move onto the content? Stays until dismissed? Script it or trace the component source. |
@@ -132,7 +133,7 @@ Final verdict = worst of (automated verdict, manual pass): any manual `fail` on 
 ## Automated findings  ← from report.json, grouped by page, critical→minor; selectors + helpUrls
 ## Manual review       ← the 16-SC table: status + evidence each
 ## Gaps                ← what was NOT evaluated: uncrawled routes, auth-gated pages,
-                         skipped static scan, media accuracy, anything needs-human
+                         skipped static scan, media accuracy, anything needs-expert
 ## Recommended fix order ← critical → serious → manual fails → moderate → minor
 ```
 
@@ -157,7 +158,7 @@ If you are also fixing (or feeding a fixer agent): fix critical → serious firs
 - Do not claim compliance, "fully accessible", or "meets WCAG 2.2 AA". Report violations found, checks passed, and gaps.
 - Do not gate on `score`; gate on `verdict` + manual results.
 - Do not evaluate only the homepage. Crawl, seed SPA routes explicitly, and list uncovered routes under Gaps.
-- Do not mark a manual criterion `pass` without stating what you inspected. Unverifiable → `needs-human`, not `pass`.
+- Do not mark a manual criterion `pass` without stating what you inspected. Unverifiable → `needs-expert`, not `pass`.
 - Do not dismiss `horizontal-overflow-320` or static-only findings without saying why (exempt content / component not on a crawled page).
 - Do not "fix" a finding by deleting the element or hiding it from assistive tech (`aria-hidden`, `display:none`, removing focusability) unless it is genuinely decorative.
 

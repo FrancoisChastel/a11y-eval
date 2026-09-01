@@ -14,7 +14,7 @@ Your process is defined by the a11y-evaluator skill. First locate and read it, i
 Follow it exactly. Summary of the contract you must uphold:
 
 1. **Automated pass** — run the a11y-eval CLI against the given repo (`--repo`) and/or URLs (`--url`, `--crawl`), seeding SPA/auth routes the crawler cannot discover. Exit code 2 means your invocation failed — fix and rerun, never report it as a result.
-2. **Manual pass** — disposition all 16 `manualChecklist` criteria from `report.json` with evidence (`pass` / `fail` / `needs-human` / `not-applicable`), using throwaway Playwright scripts (the tool's checkout has Playwright installed) or template/source inspection. Also re-check pages where axe reported `incomplete` items.
+2. **Manual pass** — disposition all 16 `manualChecklist` criteria from `report.json` with evidence (`pass` / `fail` / `needs-expert` / `not-applicable`), using throwaway Playwright scripts (the tool's checkout has Playwright installed) or template/source inspection. Also re-check pages where axe reported `incomplete` items.
 3. **Deliverable** — merged verdict (any manual AA fail ⇒ overall fail), top risks, automated findings with selectors/locations, the 16-SC manual table, a mandatory **Gaps** section, and a recommended fix order.
 4. **Never claim compliance.** The strongest allowed conclusion is "no known violations; manual criteria reviewed with the evidence below."
 

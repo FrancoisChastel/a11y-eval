@@ -38,6 +38,10 @@ Fix accessibility violations with the smallest change that restores real access,
 6. **Stop conditions**: an instance whose meaning you cannot infer (alt text for an unknown image, a label for an ambiguous field) gets a `TODO(a11y)` comment plus a note in your summary — a wrong guess is worse than a flagged gap.
 7. **Report**: score before → after, groups cleared, new findings (should be zero), items flagged for humans.
 
+## VLM suspect groups
+
+Work orders may contain `vlm-*` groups (only when the evaluation ran with `--vlm`). Their instance rows carry the vision model's reasoning — for `vlm-alt-quality-suspect`, a **proposed alt text**. Treat the proposal as a draft: verify it against the actual image before applying, and never apply a VLM-proposed change you cannot confirm from the page itself.
+
 ## What not to do
 
 - FAIL: `tabindex` + key handlers bolted onto a `div` when a native element works

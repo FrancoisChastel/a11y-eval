@@ -79,4 +79,7 @@ Every metric call = one LM fix generation + one browser evaluation (~10-20 s). G
 | `optimizer/metric.py` | Stdlib-only metric: evaluator score + preservation guard + findings-as-feedback |
 | `optimizer/trainset.py` | Builds examples (page HTML + generated work order); `--page` extends it |
 | `optimizer/fixtures/flawed-fixed.html` | Hand-fixed reference proving a 1.0 is reachable (used by --dry-run and CI) |
-| `skills/a11y-fixer/SKILL.md` | The skill; the block between `OPTIMIZED-INSTRUCTIONS` markers is the optimization target |
+| `optimizer/adjudicator.py` | Adjudicator target: gold-label agreement metric, browserless at scoring time |
+| `optimizer/gold-adjudications.json` | Hand-labeled correct dispositions for the fixtures (we planted the issues) |
+| `skills/a11y-fixer/SKILL.md` | Fixer target; the block between `OPTIMIZED-INSTRUCTIONS` markers is optimized |
+| `skills/a11y-evaluator/SKILL.md` | Adjudicator target; its judgment block is also loaded at runtime by `--llm` |
