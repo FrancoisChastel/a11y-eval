@@ -66,20 +66,32 @@ await pause(500)
 await moveAndClick(dragging.locator('.suggestion button'))
 await pause(1400)
 
-// 4. Fail 2.4.3 Focus Order — its suspects panel shows the detected tab-order jump
-const focusOrder = page.locator('fieldset.criterion', { has: page.locator('legend', { hasText: '2.4.3' }) })
+// 4. Fail 2.4.3 Focus Order — the card auto-collapses with a red pill; re-expand to add evidence
+const focusOrder = page.locator('fieldset.criterion[data-sc="2.4.3"]')
 await scrollTo(focusOrder)
 await moveAndClick(focusOrder.locator('input[value="fail"]'))
-await pause(500)
+await pause(900)
+await moveAndClick(focusOrder.locator('.collapse-toggle'))
+await pause(400)
 const evidence = focusOrder.locator('textarea')
 await moveAndClick(evidence)
 await evidence.pressSequentially('Tab order jumps to the footer mid-form on flawed.html.', { delay: 28 })
-await pause(900)
+await pause(700)
 
-// 5. Progress + export in the sticky footer
+// 5. New toolbar: filter to Failed, then jump to the next unreviewed criterion
+await page.evaluate(() => scrollTo({ top: 0, behavior: 'smooth' }))
+await pause(900)
+await moveAndClick(page.locator('.chip[data-filter="failed"]'))
+await pause(1400)
+await moveAndClick(page.locator('.chip[data-filter="all"]'))
+await pause(500)
+await moveAndClick(page.locator('.jump'))
+await pause(1600)
+
+// 6. Progress + export in the sticky footer
 await scrollTo(page.locator('#app-footer button').first())
 await page.mouse.move(640, 740, { steps: 15 })
-await pause(2200)
+await pause(1800)
 
 await context.close()
 const video = page.video()

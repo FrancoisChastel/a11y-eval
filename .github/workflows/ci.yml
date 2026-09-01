@@ -72,14 +72,18 @@ jobs:
 
       - name: Wave-1 engines + interact probes detect the planted wave1 violations
         run: |
-          node src/cli.ts --url test-fixtures/wave1.html --interact --out /tmp/r-wave1 || true
+          node src/cli.ts --url test-fixtures/wave1.html --interact --sr --out /tmp/r-wave1 || true
           node -e "
             const r = require('/tmp/r-wave1/report.json');
             const rules = new Set(r.findings.map(f => f.ruleId));
-            const expected = ['on-focus-context-change','slider-keyboard-inoperable','hover-content-not-dismissible','focus-order-suspect','sensory-instruction-suspect','lang-of-parts-suspect','no-caption-track','target-size-suspect'];
+            const expected = ['on-focus-context-change','slider-keyboard-inoperable','hover-content-not-dismissible','focus-order-suspect','sensory-instruction-suspect','lang-of-parts-suspect','no-caption-track','target-size-suspect','cca-contrast'];
             for (const rule of expected) if (!rules.has(rule)) { console.error('missing rule:', rule); process.exit(1); }
             if (!r.evidence || r.evidence.length === 0) { console.error('expected evidence packets'); process.exit(1); }
             if (r.verdict !== 'fail') { console.error('expected fail verdict'); process.exit(1); }
+            if (r.meta.screenReader !== 'axtree') { console.error('expected axtree screen-reader driver, got', r.meta.screenReader); process.exit(1); }
+            if (!(r.evidence || []).some(p => p.kind === 'screen-reader')) { console.error('missing screen-reader narration evidence'); process.exit(1); }
+            if (!(r.evidence || []).some(p => p.kind === 'cca' && p.items[0].text.includes('PASSES'))) { console.error('missing CCA resolved evidence'); process.exit(1); }
+            if (!require('fs').existsSync('/tmp/r-wave1/evidence/narration-p0.txt')) { console.error('missing narration file'); process.exit(1); }
           "
 
       - name: Suspects gate only under --strict

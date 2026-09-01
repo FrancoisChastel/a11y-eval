@@ -1,6 +1,6 @@
 export type Impact = 'critical' | 'serious' | 'moderate' | 'minor'
 
-export type Engine = 'axe' | 'keyboard' | 'static' | 'vlm' | 'agent' | 'human'
+export type Engine = 'axe' | 'keyboard' | 'static' | 'cca' | 'vlm' | 'agent' | 'human'
 
 export type Verdict = 'pass' | 'pass-with-issues' | 'fail'
 
@@ -169,6 +169,10 @@ export interface ReportMeta {
   vlm?: string
   /** Vision checks that could not run (API errors, parse failures) — a gap, not a pass. */
   vlmNote?: string
+  /** Screen-reader driver used ('axtree' simulation, or real 'nvda'/'voiceover'). */
+  screenReader?: string
+  /** Screen-reader runs that fell back or failed — a gap, not a pass. */
+  screenReaderNote?: string
 }
 
 export interface Report {
@@ -227,5 +231,7 @@ export interface EvaluateOptions {
   evidenceDir?: string
   /** provider/model for vision checks; enables the --vlm tier. */
   vlm?: string
+  /** Screen-reader pass: 'axtree' (simulation, cross-platform) | 'nvda' | 'voiceover'. */
+  screenReader?: 'axtree' | 'nvda' | 'voiceover'
   meta?: ReportMeta
 }

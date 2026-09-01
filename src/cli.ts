@@ -51,6 +51,13 @@ Evaluate options:
                          axe-incomplete contrast triage); tier 2 prefills review
                          observations (320px reflow, hover occlusion, label layout);
                          tier 3 enriches media criteria (needs-expert ceiling).
+  --sr [driver]          Screen-reader pass, narration saved per page + attached as
+                         evidence. Drivers: axtree (default — deterministic simulation
+                         from Chromium's accessibility tree, runs anywhere), nvda
+                         (real NVDA, Windows, experimental), voiceover (real VoiceOver,
+                         macOS, experimental). Real drivers need a one-time
+                         "npx @guidepup/setup" and run the browser headed; on failure
+                         they fall back to axtree with the gap recorded.
   --out <dir>            Output directory (default: a11y-report).
                          Writes report.json + report.md + review.html.
   --json                 Print the JSON report to stdout.
@@ -81,6 +88,7 @@ interface CliArgs {
   interact: boolean
   llm?: string
   vlmModel?: string
+  srDriver?: 'axtree' | 'nvda' | 'voiceover'
   repo?: string
   startCmd?: string
   port?: number
@@ -130,6 +138,13 @@ const parseArgs = (argv: string[]): CliArgs => {
     } else if (arg === '--vlm') {
       const peek = argv[i + 1]
       args.vlmModel = peek && !peek.startsWith('-') ? argv[++i] : DEFAULT_ADJUDICATION_MODEL
+    } else if (arg === '--sr') {
+      const peek = argv[i + 1]
+      const value = peek && !peek.startsWith('-') ? argv[++i] : 'axtree'
+      if (value !== 'axtree' && value !== 'nvda' && value !== 'voiceover') {
+        throw new Error(`--sr driver must be axtree, nvda, or voiceover (got "${value}")`)
+      }
+      args.srDriver = value
     }
     else if (arg === '--manual') args.manualPath = resolve(next(++i, '--manual'))
     else if (arg === '--report') args.reportDir = next(++i, '--report')
@@ -280,6 +295,7 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
       strict: args.strict,
       interact: args.interact,
       vlm: args.vlmModel,
+      screenReader: args.srDriver,
       evidenceDir: join(resolve(outDirEarly), 'evidence'),
       meta,
     })
@@ -331,6 +347,11 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
         const vlmSuspects = report.findings.filter((f) => f.engine === 'vlm').length
         extras.push(`VLM checks by ${args.vlmModel}: ${vlmSuspects} suspect(s) flagged${report.meta?.vlmNote ? ' (some checks failed — see gaps)' : ''}`)
       }
+      if (args.srDriver) {
+        extras.push(`Screen reader: ${report.meta?.screenReader ?? args.srDriver}${report.meta?.screenReaderNote ? ' (fallback — see gaps)' : ''} — narration in ${join(outDir, 'evidence')}/`)
+      }
+      const ccaCount = report.findings.filter((f) => f.engine === 'cca').length
+      if (ccaCount > 0) extras.push(`CCA pixel contrast: ${ccaCount} measured verdict(s) on axe-undecidable text`)
       printSummary(report, outDir, extras)
       console.log(
         `verdict=${report.verdict} score=${report.score} ` +

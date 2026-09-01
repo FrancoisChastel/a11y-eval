@@ -1,4 +1,4 @@
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium, type Page } from 'playwright'
 import { diffAgainstBaseline, fingerprint } from './baseline.ts'
@@ -13,12 +13,14 @@ import { collectSignals } from './engines/signals.ts'
 import { eslintReportToFindings } from './engines/staticMerge.ts'
 import { resolveBackend } from './engines/adjudicate.ts'
 import { runVlmChecks } from './engines/vlm.ts'
+import { runCcaContrast } from './engines/contrast.ts'
+import { runScreenReader } from './engines/screenReader.ts'
 import { buildRemediationPlan } from './remediations.ts'
 import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict, partitionFindings } from './scoring.ts'
 import type { BaselineDiff, EvaluateOptions, EvidencePacket, Finding, PageResult, Report } from './types.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from './wcag.ts'
 
-export const VERSION = '0.11.0'
+export const VERSION = '0.12.0'
 
 const DEFAULT_MAX_PAGES = 15
 const DEFAULT_MAX_DEPTH = 3
@@ -64,8 +66,11 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
 
   const vlmBackend = options.vlm ? resolveBackend(options.vlm) : null
   const vlmNotes: string[] = []
+  const srNotes: string[] = []
+  let srDriverUsed: string | undefined
 
-  const browser = await chromium.launch()
+  const headed = options.screenReader === 'nvda' || options.screenReader === 'voiceover'
+  const browser = await chromium.launch({ headless: !headed })
   const pages: PageResult[] = []
   const evidence: EvidencePacket[] = []
   let urls = options.urls
@@ -84,7 +89,20 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
       try {
         await page.goto(url, { waitUntil: 'networkidle' })
         const axeResult = await runAxe(page, url)
+        const cca = await runCcaContrast(page, url, axeResult.incompleteItems)
+        evidence.push(...cca.evidence)
         const signals = await collectSignals(page)
+
+        if (options.screenReader) {
+          const sr = await runScreenReader(page, url, options.screenReader)
+          evidence.push(sr.evidence)
+          srDriverUsed = sr.driverUsed
+          if (sr.note) srNotes.push(`${url}: ${sr.note}`)
+          if (options.evidenceDir) {
+            await mkdir(options.evidenceDir, { recursive: true })
+            await writeFile(join(options.evidenceDir, `narration-p${pageIndex}.txt`), sr.phrases.join('\n'))
+          }
+        }
         const keyboardFindings = await runKeyboardChecks(page, url, options.focusSampleSize)
         const targetSizeFindings = await runTargetSizeCheck(page, url)
         const contentResult = await runContentChecks(page, url)
@@ -99,7 +117,8 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
         if (vlmBackend) {
           const vlm = await runVlmChecks(page, url, vlmBackend, {
             stops: focusFlow.stops,
-            incompleteItems: axeResult.incompleteItems,
+            // CCA already measured these deterministically; VLM only triages the rest.
+            incompleteItems: axeResult.incompleteItems.filter((i) => !cca.measuredTargets.includes(i.target)),
             signals,
           })
           vlmFindings = vlm.findings
@@ -109,6 +128,7 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
 
         const pageFindings = [
           ...axeResult.findings,
+          ...cca.findings,
           ...keyboardFindings,
           ...targetSizeFindings,
           ...contentResult.findings,
@@ -165,6 +185,8 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
       seeds: options.urls,
       ...(options.vlm ? { vlm: options.vlm } : {}),
       ...(vlmNotes.length > 0 ? { vlmNote: vlmNotes.slice(0, 8).join(' | ') } : {}),
+      ...(srDriverUsed ? { screenReader: srDriverUsed } : {}),
+      ...(srNotes.length > 0 ? { screenReaderNote: srNotes.slice(0, 4).join(' | ') } : {}),
     },
     pages,
     findings,

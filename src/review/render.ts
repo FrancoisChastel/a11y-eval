@@ -36,6 +36,7 @@ ${css}
 </head>
 <body>
 <header class="app" id="app-header"></header>
+<div id="toolbar"><div class="inner" id="toolbar-inner"></div></div>
 <main>
   <!-- data-a11y-eval-ignore: these sections quote arbitrary evaluated-page content and
        review procedures; excluding them from text-level checks (sensory phrases,

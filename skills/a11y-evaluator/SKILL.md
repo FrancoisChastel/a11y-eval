@@ -50,7 +50,7 @@ node src/cli.ts --url https://staging.example.com --crawl --out /tmp/a11y
 node src/cli.ts --url http://localhost:3000/checkout --url http://localhost:3000/settings --out /tmp/a11y
 ```
 
-Useful flags: `--max-pages <n>` / `--max-depth <n>` (crawl caps, default 15/3), `--no-crawl`, `--no-static`, `--start-cmd "<cmd>"` and `--port <n>` when detection guesses wrong, `--static-report <eslint.json>` to reuse an existing lint run, `--baseline <prev report.json>` on re-runs, `--strict` to make suspects gate, `--interact` for state-changing probes (staging only), `--llm [provider/model]` for machine adjudication, `--vlm [provider/model]` for vision checks (image-capable model).
+Useful flags: `--max-pages <n>` / `--max-depth <n>` (crawl caps, default 15/3), `--no-crawl`, `--no-static`, `--start-cmd "<cmd>"` and `--port <n>` when detection guesses wrong, `--static-report <eslint.json>` to reuse an existing lint run, `--baseline <prev report.json>` on re-runs, `--strict` to make suspects gate, `--interact` for state-changing probes (staging only), `--llm [provider/model]` for machine adjudication, `--vlm [provider/model]` for vision checks (image-capable model), `--sr [axtree|nvda|voiceover]` for a screen-reader narration pass.
 
 **Seed selection matters.** The crawler only follows real `<a href>` links. Before running, check the repo's router (`grep -r "path:" src/ --include="*.ts*"`, Next `app/`/`pages/` dirs, route tables) and add `--url` seeds for important routes the crawl would miss: SPA-only navigation, auth-gated pages (needs a running logged-in instance or dev bypass), form-flow steps, error/empty states.
 
@@ -65,6 +65,7 @@ Exit codes: `0` = pass or pass-with-issues, `1` = fail (has critical/serious), `
 - `findings[]`: each has `engine`, `ruleId`, `impact`, `wcag` (success criteria), `page`, `targets` (CSS selectors for runtime, `file:line:col` for static), `html` snippet, `helpUrl`.
   - `engine: "axe"` — trust these; false positives are rare. `helpUrl` explains the fix.
   - `engine: "keyboard"` — custom checks: `keyboard-unreachable` (2.1.1), `focus-not-visible` (2.4.7), `horizontal-overflow-320` (1.4.10 — verify it isn't an exempt table/map before reporting).
+  - `engine: "cca"` — deterministic pixel-contrast measurements on axe-undecidable text; trust the measured ratios (borderline ones are suspects).
   - `engine: "vlm"` — vision suspects (only with `--vlm`): confirm or dismiss like any suspect; alt-quality ones carry a proposed replacement alt.
   - `engine: "static"` — advisory (source-level). If a static finding has no runtime counterpart, the component likely isn't on any crawled page: say so rather than dropping it.
 - `pages[]`: per-URL findings plus axe `passes`/`incomplete` counts. `incomplete` > 0 means axe itself wants human review on that page.
@@ -114,6 +115,7 @@ Also re-check any axe `incomplete` items on pages where the count is non-zero (`
 - With `--interact` (staging only) the run also probed on-input context changes (3.2.2) and dialog Escape-dismissal.
 - `--llm` runs a machine adjudication of the judgment criteria and auto-merges it as reviewer `llm:<model>` — treat those dispositions as a prior to verify, never as human sign-off; anything `needs-expert` is yours.
 - `--vlm provider/model` adds vision checks on the rendered pages, tiered by trust: **tier 1 flags suspects** (alt-text adequacy with a proposed alt, color-only meaning proven by grayscale comparison, tab-order judged on a numbered overlay, axe-incomplete contrast triage) — confirm or dismiss them like any suspect; **tier 2 prefills observations** (`vlm-observation` evidence items for 320px reflow, hover occlusion, visual label layout) — weigh them, they are never findings; **tier 3 enriches** 1.2.2/1.2.5 with keyframe spot-checks that can never exceed needs-expert — a human still watches the video. Check `meta.vlmNote`: listed checks did NOT run and their criteria were not visually verified.
+- `--sr` attaches a screen-reader narration (per-page `evidence/narration-p*.txt` + review evidence): read it as the linear experience an NVDA/VoiceOver user gets — reading order, announced names, and states. `meta.screenReader` says whether it came from a real driver or the axtree simulation; a `screenReaderNote` means the pass degraded.
 - `data-a11y-eval-ignore` on an element excludes its text from the sensory/language checks — for pages that quote arbitrary content.
 
 Record manual findings in the same shape as tool findings, with `engine: "agent"` and your evidence in `description` — downstream fixers then consume one uniform list.

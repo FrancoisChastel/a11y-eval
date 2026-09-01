@@ -136,14 +136,14 @@ export const runFocusFlowChecks = async (page: Page, url: string): Promise<Focus
     })
     if (!stop) break
     const prev = stops[stops.length - 1]
-    if (prev && prev.selector === stop.selector && prev.y === stop.y) {
+    if (prev && prev.selector === stop.selector && prev.y === stop.y && prev.x === stop.x) {
       repeats += 1
       if (repeats >= 4 && stuckAt === null && !stop.multiSegment) stuckAt = stop.selector
     } else {
       repeats = 0
       stops.push(stop)
     }
-    if (stops.length > 1 && stops[0].selector === stop.selector && stops[0].y === stop.y) break // full cycle
+    if (stops.length > 1 && stops[0].selector === stop.selector && stops[0].y === stop.y && stops[0].x === stop.x) break // full cycle
   }
 
   if (stuckAt) {

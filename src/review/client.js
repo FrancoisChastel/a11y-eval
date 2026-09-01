@@ -203,19 +203,127 @@ const updateWarning = (criterion) => {
 }
 
 const updateProgress = () => {
+  const total = report.manualChecklist.length
   const done = report.manualChecklist.filter((c) => state.items[c.sc]?.status).length
-  document.getElementById('progress').textContent = `${done} of ${report.manualChecklist.length} criteria dispositioned.`
+  document.getElementById('progress').textContent = `${done} of ${total} criteria dispositioned.`
+  const count = document.getElementById('progress-count')
+  if (count) count.textContent = `${done} / ${total}`
+  const bar = document.getElementById('progress-bar')
+  if (bar) bar.setAttribute('aria-valuenow', String(done))
+  const fill = document.getElementById('progress-fill')
+  if (fill) fill.style.width = `${Math.round((done / total) * 100)}%`
+  updateFilterCounts()
 }
 
 const suspectsFor = (sc) => report.findings.filter((f) => f.confidence === 'suspect' && f.wcag.includes(sc))
 const packetsFor = (sc) => (report.evidence || []).filter((p) => p.sc === sc)
+const hasFlag = (sc) =>
+  suspectsFor(sc).length > 0 || packetsFor(sc).some((p) => p.items.some((i) => (i.text || '').startsWith('CONCERN')))
+
+// ---------- toolbar: progress, filters, jump ----------
+const STATUS_LABELS = { pass: 'Pass', fail: 'Fail', 'needs-expert': 'Needs expert', 'not-applicable': 'N/A' }
+const criterionEls = new Map()
+let activeFilter = 'all'
+
+const matchesFilter = (criterion) => {
+  const status = state.items[criterion.sc]?.status
+  if (activeFilter === 'unreviewed') return !status
+  if (activeFilter === 'flagged') return hasFlag(criterion.sc)
+  if (activeFilter === 'failed') return status === 'fail'
+  return true
+}
+
+const applyFilter = () => {
+  for (const criterion of report.manualChecklist) {
+    const els = criterionEls.get(criterion.sc)
+    if (els) els.fieldset.style.display = matchesFilter(criterion) ? '' : 'none'
+  }
+  for (const chip of document.querySelectorAll('.chip')) {
+    chip.setAttribute('aria-pressed', String(chip.dataset.filter === activeFilter))
+  }
+  updateFilterCounts()
+}
+
+const filterCount = (filter) => {
+  const prev = activeFilter
+  activeFilter = filter
+  const n = report.manualChecklist.filter(matchesFilter).length
+  activeFilter = prev
+  return n
+}
+
+const updateFilterCounts = () => {
+  for (const chip of document.querySelectorAll('.chip .count')) {
+    chip.textContent = ` ${filterCount(chip.parentElement.dataset.filter)}`
+  }
+}
+
+const updateStatusPill = (criterion) => {
+  const els = criterionEls.get(criterion.sc)
+  if (!els) return
+  const status = state.items[criterion.sc]?.status
+  els.pill.textContent = status ? STATUS_LABELS[status] : 'Unreviewed'
+  if (status) els.pill.dataset.status = status
+  else delete els.pill.dataset.status
+}
+
+const setCollapsed = (sc, collapsed) => {
+  const els = criterionEls.get(sc)
+  if (!els) return
+  els.fieldset.classList.toggle('collapsed', collapsed)
+  els.toggle.setAttribute('aria-expanded', String(!collapsed))
+  els.toggle.textContent = collapsed ? 'Expand' : 'Collapse'
+}
+
+const jumpToNext = () => {
+  const next = report.manualChecklist.find((c) => !state.items[c.sc]?.status)
+  if (!next) {
+    announce('All criteria are dispositioned.')
+    return
+  }
+  activeFilter = 'all'
+  applyFilter()
+  setCollapsed(next.sc, false)
+  const els = criterionEls.get(next.sc)
+  els.fieldset.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  els.fieldset.querySelector('input[type="radio"]')?.focus({ preventScroll: true })
+}
+
+const renderToolbar = () => {
+  const inner = document.getElementById('toolbar-inner')
+  inner.append(
+    el('div', { class: 'progress-wrap' },
+      el('div', { class: 'progress-label' },
+        el('span', { text: 'Review progress' }),
+        el('span', { id: 'progress-count', text: '' })),
+      el('div', { class: 'progress-track', role: 'progressbar', 'aria-label': 'Criteria dispositioned', 'aria-valuemin': '0', 'aria-valuemax': String(report.manualChecklist.length), 'aria-valuenow': '0', id: 'progress-bar' },
+        el('div', { class: 'progress-fill', id: 'progress-fill' }))),
+    el('div', { class: 'filters', role: 'group', 'aria-label': 'Filter criteria' },
+      ...[['all', 'All'], ['unreviewed', 'Unreviewed'], ['flagged', 'Flagged'], ['failed', 'Failed']].map(([key, label]) =>
+        el('button', { type: 'button', class: 'chip', 'data-filter': key, 'aria-pressed': String(key === activeFilter), onclick: () => { activeFilter = key; applyFilter() } },
+          el('span', { text: label }), el('span', { class: 'count', 'aria-hidden': 'true' })))),
+    el('button', { type: 'button', class: 'jump', text: 'Next unreviewed', onclick: jumpToNext }),
+  )
+}
 
 const renderCriterion = (criterion) => {
   const current = item(criterion.sc)
   const idBase = `sc-${criterion.sc.replaceAll('.', '-')}`
 
-  const fieldset = el('fieldset', { class: 'criterion' },
-    el('legend', { text: `${criterion.sc} ${criterion.name}` }),
+  const pill = el('span', { class: 'status-pill', text: 'Unreviewed' })
+  const body = el('div', { class: 'crit-body', id: `${idBase}-body` })
+  const toggle = el('button', {
+    type: 'button',
+    class: 'collapse-toggle',
+    'aria-expanded': 'true',
+    'aria-controls': `${idBase}-body`,
+    text: 'Collapse',
+    onclick: () => setCollapsed(criterion.sc, !fieldset.classList.contains('collapsed')),
+  })
+  const fieldset = el('fieldset', { class: 'criterion', 'data-sc': criterion.sc },
+    el('legend', {}, el('span', { text: `${criterion.sc} ${criterion.name}` }), pill, toggle))
+  criterionEls.set(criterion.sc, { fieldset, pill, body, toggle })
+  body.append(
     el('p', { class: 'signal-note', text: criterion.why }),
     el('details', {}, el('summary', { text: 'How to review' }), el('p', { text: criterion.how })))
 
@@ -228,7 +336,7 @@ const renderCriterion = (criterion) => {
         el('code', { text: s.targets[0] || '' }),
         el('span', { text: ` on ${s.page}` }),
         ...(s.evidence || []).map((shot) => el('span', {}, el('br'), el('img', { src: shot, alt: `Screenshot of suspect ${s.ruleId} at ${s.targets[0] || ''}`, style: 'max-width:220px;height:auto;border:1px solid var(--border-soft);border-radius:4px;margin-top:0.25rem' }))))))
-    fieldset.append(el('div', { class: 'warning', role: 'note' },
+    body.append(el('div', { class: 'warning', role: 'note' },
       el('p', {}, el('strong', { text: `${suspects.length} machine-flagged suspect(s) — confirm as Fail or dismiss with evidence:` })),
       list))
   }
@@ -236,7 +344,7 @@ const renderCriterion = (criterion) => {
   // Collected evidence packets (headings, labels, tab order…) for judgment criteria.
   for (const packet of packetsFor(criterion.sc)) {
     if (packet.items.length === 0) continue
-    fieldset.append(el('details', {},
+    body.append(el('details', {},
       el('summary', { text: `Collected evidence: ${packet.kind} (${packet.items.length})` }),
       el('ul', {}, ...packet.items.slice(0, 40).map((entry) =>
         el('li', {}, el('code', { text: entry.selector || '' }), el('span', { text: ` ${entry.text || ''} — ${entry.page}` }))))))
@@ -246,10 +354,10 @@ const renderCriterion = (criterion) => {
   if (criterion.signal !== null) {
     const total = signalTotals[criterion.signal] || 0
     if (total > 0) {
-      fieldset.append(el('p', { class: 'signal-note', text: `Signals: ${total} ${SIGNAL_LABELS[criterion.signal]} detected on: ${pagesWithSignal(criterion.signal).join(', ')} — this criterion must be reviewed.` }))
+      body.append(el('p', { class: 'signal-note', text: `Signals: ${total} ${SIGNAL_LABELS[criterion.signal]} detected on: ${pagesWithSignal(criterion.signal).join(', ')} — this criterion must be reviewed.` }))
     } else if (!current.status) {
       const evidenceText = `No ${SIGNAL_LABELS[criterion.signal]} detected across ${report.pages.length} evaluated page(s) (content signals).`
-      fieldset.append(el('div', { class: 'suggestion' },
+      body.append(el('div', { class: 'suggestion' },
         el('p', { text: `${evidenceText} Suggested: Not applicable.` }),
         el('button', { type: 'button', class: 'small', text: 'Apply suggested N/A', onclick: (e) => {
           Object.assign(current, { status: 'not-applicable', evidence: evidenceText, autoSuggested: true, method: 'signal-based' })
@@ -257,6 +365,9 @@ const renderCriterion = (criterion) => {
           fieldset.querySelector(`#${idBase}-evidence`).value = evidenceText
           e.target.closest('.suggestion').remove()
           updateWarning(criterion)
+          updateStatusPill(criterion)
+          setCollapsed(criterion.sc, true)
+          applyFilter()
           save()
         } })))
     }
@@ -270,20 +381,30 @@ const renderCriterion = (criterion) => {
         current.status = value
         current.autoSuggested = false
         updateWarning(criterion)
+        updateStatusPill(criterion)
+        setCollapsed(criterion.sc, true)
+        applyFilter()
         save()
       } }),
       el('span', { text: label })))
   }
-  fieldset.append(statusGroup)
+  body.append(statusGroup)
 
   const warning = el('p', { class: 'warning', role: 'alert', style: 'display:none' })
   criterionWarning.set(criterion.sc, warning)
-  fieldset.append(warning)
+  body.append(warning)
 
   // Evidence
-  fieldset.append(el('div', { class: 'field' },
+  body.append(el('div', { class: 'field' },
     el('label', { for: `${idBase}-evidence` }, el('span', { text: 'Evidence' }), el('span', { class: 'hint', text: ' (optional but strongly encouraged: what you inspected and observed — undocumented statuses are flagged in the final report)' })),
-    el('textarea', { id: `${idBase}-evidence`, oninput: (e) => { current.evidence = e.target.value; current.autoSuggested = false; updateWarning(criterion); save() } }, document.createTextNode(current.evidence || ''))))
+    el('textarea', { id: `${idBase}-evidence`, oninput: (e) => {
+      current.evidence = e.target.value
+      current.autoSuggested = false
+      e.target.style.height = 'auto'
+      e.target.style.height = `${e.target.scrollHeight + 2}px`
+      updateWarning(criterion)
+      save()
+    } }, document.createTextNode(current.evidence || ''))))
 
   // Affected pages
   const pagesGroup = el('div', { class: 'pages-group' })
@@ -297,7 +418,7 @@ const renderCriterion = (criterion) => {
       }, 'aria-describedby': index === 0 ? `${idBase}-pages-hint` : undefined }),
       el('span', { text: page.url })))
   }
-  fieldset.append(el('div', { class: 'field' },
+  body.append(el('div', { class: 'field' },
     el('span', { class: 'hint', id: `${idBase}-pages-hint`, text: 'Affected pages (leave unchecked if the disposition applies app-wide):' }),
     pagesGroup))
 
@@ -308,7 +429,7 @@ const renderCriterion = (criterion) => {
   const methodSelect = el('select', { id: `${idBase}-method`, onchange: (e) => { current.method = e.target.value || undefined; save() } },
     el('option', { value: '', text: 'not specified' }),
     ...METHODS.map((m) => el('option', { value: m, text: m, selected: current.method === m })))
-  fieldset.append(el('div', { class: 'inline-fields' },
+  body.append(el('div', { class: 'inline-fields' },
     el('div', { class: 'field' }, el('label', { for: `${idBase}-severity`, text: 'Severity if failed' }), severitySelect),
     el('div', { class: 'field' }, el('label', { for: `${idBase}-method`, text: 'Review method' }), methodSelect)))
 
@@ -341,7 +462,10 @@ const renderCriterion = (criterion) => {
       shotList))
   }
 
+  fieldset.append(body)
   updateWarning(criterion)
+  updateStatusPill(criterion)
+  if (current.status) setCollapsed(criterion.sc, true)
   return fieldset
 }
 
@@ -402,7 +526,9 @@ const renderFooter = () => {
 }
 
 renderHeader()
+renderToolbar()
 renderSummary()
 renderPlan()
 renderChecklist()
 renderFooter()
+applyFilter()

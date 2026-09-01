@@ -49,6 +49,8 @@ Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `re
 |--------|------|--------|
 | `axe` | [axe-core](https://github.com/dequelabs/axe-core) (MPL-2.0) via `@axe-core/playwright` | WCAG 2.0/2.1/2.2 A+AA automated rules: contrast, names/roles/values, ARIA validity, document structure |
 | `keyboard` | Custom [Playwright](https://github.com/microsoft/playwright) checks | Gaps axe can't see: **2.1.1** click-affordance elements not keyboard-operable, **2.4.7** no visible focus indicator, **1.4.10** horizontal overflow at 320px |
+| `cca` | [pngjs](https://github.com/pngjs/pngjs) pixel sampling + WCAG math | Colour-Contrast-Analyser-grade measurement of the text axe marks undecidable (gradients/images): exact computed foreground vs worst-point sampled background — deterministic verdicts with measured ratios |
+| `sr` (opt-in `--sr`) | Chromium accessibility tree (default), real NVDA/VoiceOver via [Guidepup](https://github.com/guidepup/guidepup) (experimental) | Screen-reader narration per page: what an NVDA/VoiceOver user would hear, saved to `evidence/` and attached as review evidence |
 | `vlm` (opt-in `--vlm`) | Any image-capable LLM via the provider layer | Vision judgments as tiered suspects/observations: alt-text adequacy, color-only meaning (grayscale pairs), focus-order overlays, contrast triage, reflow/hover/label observations, media keyframes |
 | `static` | Bundled [ESLint](https://eslint.org) + [jsx-a11y](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y) + [vuejs-accessibility](https://github.com/vue-a11y/eslint-plugin-vuejs-accessibility) (self-contained; repo's own ESLint merged in when present) | Pre-render source issues in React (JS/JSX/TS/TSX) and Vue SFCs, mapped to `file:line:col` |
 
@@ -70,6 +72,9 @@ Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `re
 --interact             State-changing probes (change inputs, open dialogs). STAGING ONLY.
 --llm [provider/model] LLM adjudication of the manual checklist, auto-merged (any provider).
 --vlm [provider/model] Vision checks with tiered trust (model must accept images).
+--sr [driver]          Screen-reader narration pass: axtree (default, simulation from
+                       Chromium's accessibility tree, runs anywhere) | nvda | voiceover
+                       (real drivers via Guidepup — experimental, need npx @guidepup/setup).
 --out <dir>            Output dir (default a11y-report). --json  Print JSON to stdout.
 
 # Subcommands
@@ -238,6 +243,7 @@ Regenerating the README demos after UI/CLI changes: the explainer via `cd video 
 - The reflow check flags overflow, not the SC's exemptions (data tables, maps) — treat `horizontal-overflow-320` as review-required.
 - The crawler follows links, so pages reachable only through form submissions, auth, or JS-only navigation need explicit `--url` seeds (or a Playwright storage state / dev auth bypass).
 - SPA client-side route changes without `<a href>` links are not discovered — seed those routes explicitly.
+- Real screen-reader drivers (`--sr nvda` / `--sr voiceover`) are experimental: they need the right OS, a one-time `npx @guidepup/setup`, and a headed browser; on any failure the run falls back to the `axtree` simulation with the gap recorded. The simulation reads Chromium's accessibility tree — close to what NVDA announces, but it is not NVDA itself.
 - `--vlm` needs an image-capable model and costs per screenshot (≈4–8 calls/page); its verdicts are suspects/observations by design — vision models hallucinate confidently, so nothing a VLM says gates CI or substitutes for human sign-off.
 
 ## Contributing

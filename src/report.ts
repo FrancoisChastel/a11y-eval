@@ -38,6 +38,7 @@ const atAGlance = (report: Report): string[] => {
     ['Engines', enginesRan.join(' · ') + (engines.has('human') ? ' · human review' : '') + (engines.has('agent') ? ' · agent review' : '')],
     ['Fix groups', `${(report.remediationPlan ?? []).length} — full agent work order in mitigations.md`],
     ['Suspects', suspectCount === 0 ? 'none' : `${suspectCount} machine-flagged, pre-filled in review.html${report.strict ? ' (gating: strict)' : ' (not gating)'}`],
+    ...(report.meta?.screenReader ? ([['Screen reader', `${report.meta.screenReader}${report.meta.screenReader === 'axtree' ? ' (accessibility-tree simulation)' : ' (real driver)'} — narration in evidence/`]] as [string, string][]) : []),
     ...(report.meta?.vlm ? ([['VLM checks', `${report.meta.vlm} — tier 1 flags suspects, tier 2 prefills observations, tier 3 enriches media evidence${report.meta.vlmNote ? ' (some checks failed — see Gaps)' : ''}`]] as [string, string][]) : []),
     ['Manual review', manualState],
   ]
@@ -91,6 +92,9 @@ const gaps = (report: Report): string[] => {
     }
     const experts = report.manualReview.items.filter((i) => i.status === 'needs-expert')
     if (experts.length > 0) items.push(`Deferred to a human specialist: ${experts.map((i) => i.sc).join(', ')}.`)
+  }
+  if (report.meta?.screenReaderNote) {
+    items.push(`Screen-reader pass degraded: ${report.meta.screenReaderNote}`)
   }
   if (report.meta?.vlmNote) {
     items.push(`Some VLM checks did not complete (their criteria were NOT visually verified): ${report.meta.vlmNote}`)

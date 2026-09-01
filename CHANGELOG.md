@@ -3,6 +3,14 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.12.0] - 2026-09-01
+
+### Added
+
+- **CCA engine** (always on): Colour-Contrast-Analyser-grade pixel measurement for the text axe marks undecidable (gradients/images). Exact computed foreground vs worst-point background sampled from a text-hidden screenshot — deterministic `cca-contrast` violations with measured ratios, borderline results as suspects, passing nodes recorded as resolved evidence. VLM contrast triage now only receives what CCA could not measure.
+- **Screen-reader support** (`--sr`): narration pass per page — `axtree` driver (default) composes NVDA-style phrases from Chromium's real accessibility tree (roles, names, heading levels, states, unnamed-control flags) deterministically on any OS; `nvda` and `voiceover` drivers capture the real thing via Guidepup (experimental: right OS + `npx @guidepup/setup` + headed browser), falling back to axtree with the gap recorded. Narration saved to `evidence/narration-p*.txt` and attached as review evidence.
+- **Review UI overhaul**: sticky toolbar with live progress bar, filter chips (All / Unreviewed / Flagged / Failed) with counts, jump-to-next-unreviewed; color-coded status pills per criterion; dispositioned criteria auto-collapse into slim rows (expandable); segmented status controls; card styling with dark-mode parity; auto-growing evidence fields. Dogfood gate held — and caught a real contrast bug in the new toolbar before release.
+
 ## [0.11.0] - 2026-09-01
 
 ### Added

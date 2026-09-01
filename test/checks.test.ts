@@ -95,3 +95,22 @@ describe('normalizePageLang (3.1.2)', () => {
     expect(normalizePageLang(undefined)).toBeNull()
   })
 })
+
+describe('composeNarration (screen-reader simulation)', () => {
+  test('speaks roles, names, heading levels, states, and flags unnamed controls', async () => {
+    const { composeNarration } = await import('../src/engines/screenReader.ts')
+    const phrases = composeNarration([
+      { nodeId: '1', ignored: false, role: { value: 'RootWebArea' }, name: { value: 'Page' }, childIds: ['2', '3', '4', '5', '6'] },
+      { nodeId: '2', ignored: false, role: { value: 'heading' }, name: { value: 'Billing' }, properties: [{ name: 'level', value: { value: 2 } }] },
+      { nodeId: '3', ignored: false, role: { value: 'StaticText' }, name: { value: 'Your plan renews monthly.' } },
+      { nodeId: '4', ignored: false, role: { value: 'checkbox' }, name: { value: 'Auto-renew' }, properties: [{ name: 'checked', value: { value: 'true' } }] },
+      { nodeId: '5', ignored: false, role: { value: 'button' }, name: { value: '' } },
+      { nodeId: '6', ignored: true, role: { value: 'generic' }, childIds: [] },
+    ])
+    expect(phrases).toContain('heading level 2, Billing')
+    expect(phrases).toContain('Your plan renews monthly.')
+    expect(phrases).toContain('checkbox, Auto-renew, checked')
+    expect(phrases.some((p) => p.includes('(no accessible name)'))).toBe(true)
+    expect(phrases.some((p) => p.includes('generic'))).toBe(false)
+  })
+})

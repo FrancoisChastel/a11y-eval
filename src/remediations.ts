@@ -89,6 +89,18 @@ const CATALOG: Record<string, Remediation> = {
     effort: 'medium',
     pitfalls: ['aria-valuenow updated only on drag leaves keyboard users with a slider that announces but never moves.'],
   },
+  'cca-contrast': {
+    summary: 'Fix the text/background pair at its measured worst point (ratio in the finding).',
+    steps: [
+      'Add a scrim/overlay behind text over images or gradients, or move the text off the busy region.',
+      'Re-run the evaluation: the CCA engine re-measures the worst-point ratio deterministically.',
+    ],
+    effort: 'small',
+    pitfalls: [
+      'Averaging the background is not compliance — the ratio must hold at the worst point the text sits on.',
+      'Do not fix by shrinking or hiding the text.',
+    ],
+  },
   'vlm-alt-quality-suspect': {
     summary: 'Rewrite the alt text to convey the image’s information, not restate the medium.',
     steps: [
