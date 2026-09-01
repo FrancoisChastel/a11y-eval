@@ -89,6 +89,24 @@ const CATALOG: Record<string, Remediation> = {
     effort: 'medium',
     pitfalls: ['aria-valuenow updated only on drag leaves keyboard users with a slider that announces but never moves.'],
   },
+  'vlm-alt-quality-suspect': {
+    summary: 'Rewrite the alt text to convey the image’s information, not restate the medium.',
+    steps: [
+      'Use the proposed alt in the finding as a starting point; verify it against the actual image.',
+      'Informative: state what the image tells the user. Decorative: alt="" instead.',
+    ],
+    effort: 'trivial',
+    pitfalls: ['This is a VLM suspect — confirm the image’s meaning before rewriting; a wrong alt is worse than a vague one.'],
+  },
+  'vlm-color-meaning-suspect': {
+    summary: 'Add a second cue (text, icon, underline, pattern) wherever color alone carries meaning.',
+    steps: [
+      'Locate the element/chart the finding names; verify with a grayscale view.',
+      'Add a non-color cue: labels or patterns for chart series, icons/text for statuses, underline for links in prose.',
+    ],
+    effort: 'small',
+    pitfalls: ['Do not just darken the colors — distinguishability for colorblind users needs a non-hue cue, not a different hue.'],
+  },
   // ---- high-frequency axe rules ----
   'image-alt': {
     summary: 'Give every informative image a meaningful alt; mark decorative ones empty.',

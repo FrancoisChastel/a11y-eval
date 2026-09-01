@@ -10,10 +10,18 @@ const asImpact = (impact: string | null | undefined): Impact => {
   return 'moderate'
 }
 
+export interface AxeIncompleteItem {
+  ruleId: string
+  target: string
+  html: string
+}
+
 export interface AxeRunResult {
   findings: Finding[]
   passes: number
   incomplete: number
+  /** Nodes axe could not decide on (e.g. contrast over images) — VLM triage candidates. */
+  incompleteItems: AxeIncompleteItem[]
 }
 
 /** Runs axe-core (WCAG 2.x A + AA rulesets) against the current page. */
@@ -34,5 +42,9 @@ export const runAxe = async (page: Page, url: string): Promise<AxeRunResult> => 
     })),
   )
 
-  return { findings, passes: results.passes.length, incomplete: results.incomplete.length }
+  const incompleteItems: AxeIncompleteItem[] = results.incomplete.flatMap((rule) =>
+    rule.nodes.map((node) => ({ ruleId: rule.id, target: node.target.map(String)[0] ?? '', html: node.html })),
+  )
+
+  return { findings, passes: results.passes.length, incomplete: results.incomplete.length, incompleteItems }
 }

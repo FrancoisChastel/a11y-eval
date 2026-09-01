@@ -101,3 +101,13 @@ describe('parseAdjudication', () => {
     expect(() => parseAdjudication('I cannot do that.', ['2.4.6'])).toThrow()
   })
 })
+
+describe('extractJson (vlm parsing)', () => {
+  test('extracts objects and arrays from prose-wrapped responses', async () => {
+    const { extractJson } = await import('../src/engines/vlm.ts')
+    expect(extractJson('Sure! {"colorOnlyMeaning": true, "where": "badges"}')).toEqual({ colorOnlyMeaning: true, where: 'badges' })
+    expect(extractJson('Result:\n[{"index":0,"adequate":false}]\nDone.')).toEqual([{ index: 0, adequate: false }])
+    expect(extractJson('I cannot analyze this.')).toBeNull()
+    expect(extractJson('{"broken": ')).toBeNull()
+  })
+})

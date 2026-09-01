@@ -3,6 +3,15 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.11.0] - 2026-09-01
+
+### Added
+
+- **`--vlm` vision checks** with tier-specific handling. Tier 1 **flags** `engine:'vlm'` suspects: alt-text adequacy (with a proposed alt that flows into the work order), color-only meaning proven by color-vs-grayscale screenshot pairs (1.4.1), focus order judged on a numbered tab-stop overlay (2.4.3), and VLM triage of axe's undecidable contrast nodes (1.4.3). Tier 2 **prefills** `vlm-observation` evidence items — 320px reflow breakage, hover occlusion, visual label association — concerns marked, never findings. Tier 3 **enriches** 1.2.2/1.2.5 with keyframe spot-checks under a structural needs-expert ceiling (those SCs sit outside adjudication by construction). Every check leaves an evidence trail; per-check failures land in `meta.vlmNote` and the report's Gaps — a gap, never a silent pass.
+- Image support in the provider layer on both wires (Anthropic Messages + OpenAI Chat Completions) — the any-provider guarantee covers vision.
+- `test-fixtures/mock-llm-server.mjs`: OpenAI-compatible mock that validates image parts and serves canned verdicts; CI runs a full `--vlm` E2E against it asserting all three tier handlings.
+- Remediation catalog entries for VLM suspects; work-order instances now carry VLM descriptions (reason + proposed alt).
+
 ## [0.10.0] - 2026-09-01
 
 ### Changed

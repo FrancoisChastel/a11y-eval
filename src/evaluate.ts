@@ -11,12 +11,14 @@ import { runInteractProbes } from './engines/interact.ts'
 import { runKeyboardChecks } from './engines/keyboard.ts'
 import { collectSignals } from './engines/signals.ts'
 import { eslintReportToFindings } from './engines/staticMerge.ts'
+import { resolveBackend } from './engines/adjudicate.ts'
+import { runVlmChecks } from './engines/vlm.ts'
 import { buildRemediationPlan } from './remediations.ts'
 import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict, partitionFindings } from './scoring.ts'
 import type { BaselineDiff, EvaluateOptions, EvidencePacket, Finding, PageResult, Report } from './types.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from './wcag.ts'
 
-export const VERSION = '0.10.0'
+export const VERSION = '0.11.0'
 
 const DEFAULT_MAX_PAGES = 15
 const DEFAULT_MAX_DEPTH = 3
@@ -60,6 +62,9 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
       : []),
   ]
 
+  const vlmBackend = options.vlm ? resolveBackend(options.vlm) : null
+  const vlmNotes: string[] = []
+
   const browser = await chromium.launch()
   const pages: PageResult[] = []
   const evidence: EvidencePacket[] = []
@@ -90,6 +95,18 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
         await page.goto(url, { waitUntil: 'networkidle' })
         const focusFlow = await runFocusFlowChecks(page, url)
 
+        let vlmFindings: Finding[] = []
+        if (vlmBackend) {
+          const vlm = await runVlmChecks(page, url, vlmBackend, {
+            stops: focusFlow.stops,
+            incompleteItems: axeResult.incompleteItems,
+            signals,
+          })
+          vlmFindings = vlm.findings
+          evidence.push(...vlm.evidence)
+          vlmNotes.push(...vlm.notes.map((n) => `${url}: ${n}`))
+        }
+
         const pageFindings = [
           ...axeResult.findings,
           ...keyboardFindings,
@@ -98,6 +115,7 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
           ...hoverFindings,
           ...interactFindings,
           ...focusFlow.findings,
+          ...vlmFindings,
         ]
         if (options.evidenceDir) await captureEvidenceShots(page, pageFindings, options.evidenceDir, pageIndex)
 
@@ -141,7 +159,13 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
     target: 'wcag22aa',
     startedAt,
     finishedAt: new Date().toISOString(),
-    meta: { ...options.meta, crawled: options.crawl ?? false, seeds: options.urls },
+    meta: {
+      ...options.meta,
+      crawled: options.crawl ?? false,
+      seeds: options.urls,
+      ...(options.vlm ? { vlm: options.vlm } : {}),
+      ...(vlmNotes.length > 0 ? { vlmNote: vlmNotes.slice(0, 8).join(' | ') } : {}),
+    },
     pages,
     findings,
     totals,

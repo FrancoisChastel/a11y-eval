@@ -137,6 +137,26 @@ jobs:
           print('emission OK:', out)
           PYEOF
 
+      - name: VLM tier E2E against the mock provider (all three tier handlings)
+        run: |
+          node test-fixtures/mock-llm-server.mjs 4941 &
+          sleep 1
+          A11Y_LLM_BASE_URL=http://127.0.0.1:4941/v1 A11Y_LLM_API_KEY=test \
+            node src/cli.ts --url test-fixtures/wave1.html --vlm openai-compat/mock-vlm --out /tmp/r-vlm || true
+          kill %1 || true
+          node -e "
+            const r = require('/tmp/r-vlm/report.json');
+            const vlm = r.findings.filter(f => f.engine === 'vlm');
+            for (const rule of ['vlm-alt-quality-suspect','vlm-color-meaning-suspect','vlm-focus-order-suspect']) {
+              if (!vlm.some(f => f.ruleId === rule)) { console.error('missing tier-1 suspect:', rule); process.exit(1); }
+            }
+            if (!vlm.every(f => f.confidence === 'suspect')) { console.error('tier-1 must flag suspects, not violations'); process.exit(1); }
+            const obs = (r.evidence || []).filter(p => p.kind === 'vlm-observation');
+            if (!obs.some(p => p.sc === '1.4.10' && p.items[0].text.startsWith('CONCERN'))) { console.error('missing tier-2 reflow concern'); process.exit(1); }
+            if (!obs.some(p => p.sc === '1.2.2' && p.items[0].text.includes('ceiling: needs-expert'))) { console.error('missing tier-3 ceiling text'); process.exit(1); }
+            if (r.meta.vlm !== 'openai-compat/mock-vlm') { console.error('meta.vlm missing'); process.exit(1); }
+          "
+
       - name: Integration — baseline diff classifies fixed findings
         run: |
           node src/cli.ts --url test-fixtures/site/page2.html --baseline /tmp/r-crawl/report.json --out /tmp/r-baseline || true

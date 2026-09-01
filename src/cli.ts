@@ -45,6 +45,12 @@ Evaluate options:
                          Completions endpoint. Keys from the provider's usual env var or
                          A11Y_LLM_API_KEY; optimizer/.env is loaded automatically.
                          Default model: ${DEFAULT_ADJUDICATION_MODEL} (Anthropic).
+  --vlm [provider/model] Vision checks on rendered pages (same provider syntax; model
+                         must accept images). Tier 1 flags suspects (alt-text quality,
+                         color-only meaning via grayscale pairs, focus-order overlays,
+                         axe-incomplete contrast triage); tier 2 prefills review
+                         observations (320px reflow, hover occlusion, label layout);
+                         tier 3 enriches media criteria (needs-expert ceiling).
   --out <dir>            Output directory (default: a11y-report).
                          Writes report.json + report.md + review.html.
   --json                 Print the JSON report to stdout.
@@ -74,6 +80,7 @@ interface CliArgs {
   strict: boolean
   interact: boolean
   llm?: string
+  vlmModel?: string
   repo?: string
   startCmd?: string
   port?: number
@@ -120,6 +127,9 @@ const parseArgs = (argv: string[]): CliArgs => {
     else if (arg === '--llm') {
       const peek = argv[i + 1]
       args.llm = peek && !peek.startsWith('-') ? argv[++i] : DEFAULT_ADJUDICATION_MODEL
+    } else if (arg === '--vlm') {
+      const peek = argv[i + 1]
+      args.vlmModel = peek && !peek.startsWith('-') ? argv[++i] : DEFAULT_ADJUDICATION_MODEL
     }
     else if (arg === '--manual') args.manualPath = resolve(next(++i, '--manual'))
     else if (arg === '--report') args.reportDir = next(++i, '--report')
@@ -254,6 +264,7 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
     const argvTail = process.argv.slice(2).filter((a, i, all) => a !== '--baseline' && all[i - 1] !== '--baseline')
     meta.command = ['node src/cli.ts', ...argvTail].join(' ')
 
+    if (args.vlmModel) loadEnvFiles()
     if (args.interact) {
       console.error('WARNING: --interact runs state-changing probes (changing inputs, opening dialogs). Staging/fixtures only — never production.')
     }
@@ -268,6 +279,7 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
       baselinePath: args.baselinePath,
       strict: args.strict,
       interact: args.interact,
+      vlm: args.vlmModel,
       evidenceDir: join(resolve(outDirEarly), 'evidence'),
       meta,
     })
@@ -314,7 +326,12 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
     if (args.json) {
       console.log(JSON.stringify(report, null, 2))
     } else {
-      printSummary(report, outDir, staticFindings.length > 0 ? [`${staticFindings.length} static source finding(s) merged`] : [])
+      const extras = staticFindings.length > 0 ? [`${staticFindings.length} static source finding(s) merged`] : []
+      if (args.vlmModel) {
+        const vlmSuspects = report.findings.filter((f) => f.engine === 'vlm').length
+        extras.push(`VLM checks by ${args.vlmModel}: ${vlmSuspects} suspect(s) flagged${report.meta?.vlmNote ? ' (some checks failed — see gaps)' : ''}`)
+      }
+      printSummary(report, outDir, extras)
       console.log(
         `verdict=${report.verdict} score=${report.score} ` +
           `critical=${report.totals.critical} serious=${report.totals.serious} ` +

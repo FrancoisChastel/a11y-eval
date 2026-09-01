@@ -10,6 +10,8 @@ const FOCUSABLE = 'a[href], button, input:not([type="hidden"]), select, textarea
 export interface FocusFlowResult {
   findings: Finding[]
   tabOrder: EvidencePacket
+  /** Raw tab stops with document coordinates — used by the VLM overlay check. */
+  stops: FocusStop[]
 }
 
 /**
@@ -176,5 +178,5 @@ export const runFocusFlowChecks = async (page: Page, url: string): Promise<Focus
     items: stops.map((s, i) => ({ page: url, selector: s.selector, text: `#${i + 1} at y=${s.y}` })),
   }
 
-  return { findings, tabOrder }
+  return { findings, tabOrder, stops }
 }

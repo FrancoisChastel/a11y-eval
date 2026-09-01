@@ -129,34 +129,56 @@ export const resolveBackend = (spec: string, env: Record<string, string | undefi
   return { wire: preset.wire, model, baseUrl: baseUrl.replace(/\/$/, ''), apiKey, keyEnv: preset.keyEnv }
 }
 
-const callLlm = async (prompt: string, backend: LlmBackend): Promise<string> => {
+export interface LlmImage {
+  base64: string
+  mediaType: string
+}
+
+export interface LlmInput {
+  text: string
+  images?: LlmImage[]
+}
+
+export const callLlm = async (input: string | LlmInput, backend: LlmBackend): Promise<string> => {
+  const { text, images = [] } = typeof input === 'string' ? { text: input, images: [] } : input
   if (backend.wire === 'anthropic') {
     if (!backend.apiKey) throw new Error(`Anthropic backend needs ${backend.keyEnv} (optimizer/.env is loaded automatically).`)
+    const content = [
+      ...images.map((img) => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.base64 } })),
+      { type: 'text', text },
+    ]
     const response = await fetch(`${backend.baseUrl}/v1/messages`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': backend.apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: backend.model, max_tokens: 4000, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify({ model: backend.model, max_tokens: 4000, messages: [{ role: 'user', content }] }),
     })
     if (!response.ok) throw new Error(`Anthropic API ${response.status}: ${(await response.text()).slice(0, 300)}`)
     const data = (await response.json()) as { content?: { type: string; text?: string }[] }
-    const text = data.content?.find((c) => c.type === 'text')?.text
-    if (!text) throw new Error('Anthropic API returned no text content')
-    return text
+    const answer = data.content?.find((c) => c.type === 'text')?.text
+    if (!answer) throw new Error('Anthropic API returned no text content')
+    return answer
   }
 
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (backend.apiKey) headers.authorization = `Bearer ${backend.apiKey}`
   else if (backend.keyEnv) throw new Error(`This backend needs ${backend.keyEnv} (or A11Y_LLM_API_KEY); optimizer/.env is loaded automatically.`)
+  const openaiContent =
+    images.length === 0
+      ? text
+      : [
+          ...images.map((img) => ({ type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${img.base64}` } })),
+          { type: 'text', text },
+        ]
   const response = await fetch(`${backend.baseUrl}/chat/completions`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ model: backend.model, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: backend.model, messages: [{ role: 'user', content: openaiContent }] }),
   })
   if (!response.ok) throw new Error(`LLM API ${response.status} at ${backend.baseUrl}: ${(await response.text()).slice(0, 300)}`)
   const data = (await response.json()) as { choices?: { message?: { content?: string } }[] }
-  const text = data.choices?.[0]?.message?.content
-  if (!text) throw new Error('LLM API returned no message content')
-  return text
+  const answer = data.choices?.[0]?.message?.content
+  if (!answer) throw new Error('LLM API returned no message content')
+  return answer
 }
 
 /**

@@ -1,6 +1,6 @@
 export type Impact = 'critical' | 'serious' | 'moderate' | 'minor'
 
-export type Engine = 'axe' | 'keyboard' | 'static' | 'agent' | 'human'
+export type Engine = 'axe' | 'keyboard' | 'static' | 'vlm' | 'agent' | 'human'
 
 export type Verdict = 'pass' | 'pass-with-issues' | 'fail'
 
@@ -165,6 +165,10 @@ export interface ReportMeta {
   seeds?: string[]
   /** The CLI invocation that produced this report — quoted verbatim in verification steps. */
   command?: string
+  /** VLM model used for vision checks (--vlm), when they ran. */
+  vlm?: string
+  /** Vision checks that could not run (API errors, parse failures) — a gap, not a pass. */
+  vlmNote?: string
 }
 
 export interface Report {
@@ -221,5 +225,7 @@ export interface EvaluateOptions {
   interact?: boolean
   /** Directory where evidence screenshots are written (enables screenshot capture). */
   evidenceDir?: string
+  /** provider/model for vision checks; enables the --vlm tier. */
+  vlm?: string
   meta?: ReportMeta
 }

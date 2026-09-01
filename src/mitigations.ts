@@ -7,6 +7,8 @@ const codeBlock = (lang: string, content: string): string => `\`\`\`${lang}\n${c
 const instanceRow = (f: Finding, index: number): string[] => {
   const location = f.engine === 'static' ? `source \`${f.targets[0] ?? f.page}\`` : `\`${f.targets[0] ?? '?'}\` on ${f.page}`
   const lines = [`${index + 1}. ${location}${f.baselineStatus ? ` _(${f.baselineStatus})_` : ''}`]
+  // VLM findings carry their payload (reason, proposed alt) in the description.
+  if (f.engine === 'vlm') lines.push(`   ${f.description}`)
   if (f.html) lines.push(`   ${codeBlock('html', f.html.trim()).replaceAll('\n', '\n   ')}`)
   return lines
 }
