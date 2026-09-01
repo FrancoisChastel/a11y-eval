@@ -43,3 +43,20 @@ describe('eslintReportToFindings', () => {
     expect(eslintReportToFindings([{ filePath: '/x.ts' } as never])).toEqual([])
   })
 })
+
+describe('dedupeStaticFindings', () => {
+  test('same location + rule from two scanners collapses to one; different survive', async () => {
+    const { dedupeStaticFindings } = await import('../src/repo/staticScan.ts')
+    const f = (ruleId: string, target: string) => ({
+      engine: 'static' as const, ruleId, impact: 'moderate' as const, wcag: [],
+      description: 'd', page: '/app/src/A.tsx', targets: [target],
+    })
+    const deduped = dedupeStaticFindings([
+      f('jsx-a11y/alt-text', '/app/src/A.tsx:5:5'),
+      f('jsx-a11y/alt-text', '/app/src/A.tsx:5:5'),
+      f('jsx-a11y/alt-text', '/app/src/A.tsx:9:5'),
+      f('jsx-a11y/no-autofocus', '/app/src/A.tsx:5:5'),
+    ])
+    expect(deduped).toHaveLength(3)
+  })
+})

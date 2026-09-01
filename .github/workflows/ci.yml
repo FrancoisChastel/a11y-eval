@@ -49,13 +49,15 @@ jobs:
             if (r.verdict !== 'fail') { console.error('expected fail verdict, got', r.verdict); process.exit(1); }
           "
 
-      - name: Integration — repo mode bundled static scan finds the planted violations
+      - name: Integration — self-contained bundled static scan finds jsx + vue violations
         run: |
           node src/cli.ts --repo test-fixtures/mini-app --no-crawl --url test-fixtures/site/page2.html --out /tmp/r-static
           node -e "
             const r = require('/tmp/r-static/report.json');
             const n = r.findings.filter(f => f.engine === 'static').length;
-            if (n !== 5) { console.error('expected 5 static findings, got', n); process.exit(1); }
+            if (n !== 8) { console.error('expected 8 static findings (5 jsx + 3 vue), got', n); process.exit(1); }
+            if (!r.findings.some(f => f.ruleId.startsWith('vuejs-accessibility/'))) { console.error('missing vue findings from bundled scan'); process.exit(1); }
+            if (r.meta.staticScan !== 'bundled-a11y') { console.error('expected bundled-a11y mode, got', r.meta.staticScan); process.exit(1); }
           "
 
       - name: Dogfood — the review UI must pass its own evaluator with zero suspects

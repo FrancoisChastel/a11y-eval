@@ -1,6 +1,6 @@
 {
   "name": "a11y-eval",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "WCAG 2.2 AA evaluation tool for repos and running apps — framework detection, static source scan, dev-server start, multi-page crawl, axe-core + custom Playwright checks, with a stable JSON contract for agent consumption",
   "type": "module",
   "bin": {
@@ -36,8 +36,10 @@
     "@typescript-eslint/parser": "^8.69.0",
     "eslint": "^10.9.1",
     "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-vuejs-accessibility": "^2.6.0",
     "franc-min": "^6.2.0",
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "vue-eslint-parser": "^10.4.1"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

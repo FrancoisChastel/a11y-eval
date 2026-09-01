@@ -38,7 +38,7 @@ Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `re
 ## What repo mode does
 
 1. **Detect** — reads `package.json` + lockfiles: framework (Next/Angular/Svelte/Vue/CRA/Vite), package manager, dev script, default port.
-2. **Static scan** — runs the repo's **own ESLint** when configured (its config knows the framework); otherwise falls back to a **bundled jsx-a11y** flat config for JSX/TSX. Findings carry `file:line:col` targets. Skip with `--no-static`, or merge an existing report instead with `--static-report <eslint.json>`.
+2. **Static scan** — a **bundled, self-contained a11y ESLint** (a11y-eval's own eslint + jsx-a11y + vuejs-accessibility) always runs; it needs nothing from the target repo — no config, no installed node_modules, no lint setup. If the repo has its own ESLint config, it runs too as an *additional* source (its config may know framework rules ours doesn't) and results are merged + deduplicated. Findings carry `file:line:col` targets. Skip with `--no-static`, or merge an existing report instead with `--static-report <eslint.json>`.
 3. **Start** — runs the detected dev script (or `--start-cmd`), polls until the app responds, and kills the whole process group afterward. Skipped when `--url` is provided.
 4. **Crawl** — breadth-first same-origin link discovery from the base URL (same-directory scope for `file://`). Anchors, `mailto:`/`javascript:`, external origins, and asset links are skipped. Caps: `--max-pages` (15), `--max-depth` (3). On by default in repo mode (`--no-crawl` to disable).
 5. **Evaluate every page** with the runtime engines, then merge runtime + static findings into one report.
@@ -49,7 +49,7 @@ Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `re
 |--------|------|--------|
 | `axe` | [axe-core](https://github.com/dequelabs/axe-core) (MPL-2.0) via `@axe-core/playwright` | WCAG 2.0/2.1/2.2 A+AA automated rules: contrast, names/roles/values, ARIA validity, document structure |
 | `keyboard` | Custom [Playwright](https://github.com/microsoft/playwright) checks | Gaps axe can't see: **2.1.1** click-affordance elements not keyboard-operable, **2.4.7** no visible focus indicator, **1.4.10** horizontal overflow at 320px |
-| `static` | [ESLint](https://eslint.org) + repo config or bundled [eslint-plugin-jsx-a11y](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y) | Pre-render source issues, mapped to `file:line:col` |
+| `static` | Bundled [ESLint](https://eslint.org) + [jsx-a11y](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y) + [vuejs-accessibility](https://github.com/vue-a11y/eslint-plugin-vuejs-accessibility) (self-contained; repo's own ESLint merged in when present) | Pre-render source issues in JS/JSX/TS/TSX/Vue, mapped to `file:line:col` |
 
 ## CLI reference
 
@@ -80,7 +80,7 @@ const report = await evaluate({ urls: ['http://localhost:3000'], crawl: true, ma
   "verdict": "fail",              // pass | pass-with-issues | fail
   "score": 40,                    // 0-100, weighted + instance-capped
   "totals": { "critical": 1, "serious": 3, "moderate": 5, "minor": 0 },
-  "meta": { "repo": "/path", "framework": "vite", "staticScan": "bundled-jsx-a11y", "crawled": true, "seeds": ["…"] },
+  "meta": { "repo": "/path", "framework": "vite", "staticScan": "bundled-a11y", "crawled": true, "seeds": ["…"] },
   "pages": [ /* per-URL findings, axe passes/incomplete counts */ ],
   "findings": [
     { "engine": "axe", "ruleId": "color-contrast", "impact": "serious", "wcag": ["1.4.3"],

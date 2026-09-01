@@ -158,7 +158,7 @@ export interface ReportMeta {
   repo?: string
   framework?: string
   /** How the static findings were produced. */
-  staticScan?: 'repo-eslint' | 'bundled-jsx-a11y' | 'external-report' | 'skipped' | 'none'
+  staticScan?: 'bundled-a11y' | 'bundled+repo-eslint' | 'repo-eslint' | 'external-report' | 'skipped' | 'none'
   staticScanNote?: string
   /** True when pages were discovered by crawling rather than listed explicitly. */
   crawled?: boolean

@@ -3,6 +3,16 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.10.0] - 2026-09-01
+
+### Changed
+
+- **Static scan is now self-contained.** The bundled a11y ESLint (a11y-eval's own eslint + plugins) always runs and never depends on the target repo's lint setup — no config, no installed node_modules required. A repo's own ESLint config, when present, runs as an *additional* source and results are merged + deduplicated (`bundled+repo-eslint` mode). This fixes the masking case where a repo config without a11y plugins reported a successful zero-finding scan.
+
+### Added
+
+- **Vue support in the bundled scan**: `eslint-plugin-vuejs-accessibility` + `vue-eslint-parser` lint `.vue` SFCs out of the box; Vue fixture with planted violations; CI asserts jsx + vue findings and the `bundled-a11y` mode.
+
 ## [0.9.0] - 2026-08-31
 
 ### Added
