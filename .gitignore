@@ -8,3 +8,4 @@ video/node_modules/
 optimizer/.venv/
 optimizer/.env
 optimizer/out/
+__pycache__/
