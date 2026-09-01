@@ -7,3 +7,4 @@ video/out/
 video/node_modules/
 optimizer/.venv/
 optimizer/.env
+optimizer/out/

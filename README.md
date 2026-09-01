@@ -122,7 +122,7 @@ The 16 criteria automation "cannot verify" are not one problem but three — and
 | **Suspects** (confirm, don't hunt) | 2.5.8 target-size geometry (spacing + inline exceptions computed, labels unioned) · 2.4.3 tab-order upward jumps · 2.1.2 Tab-cycle stalls · 1.3.3 sensory-phrase lexicon · 3.1.2 offline language detection (franc) · 1.2.2 missing caption tracks | Pre-fill the review UI with quotes/screenshots; **never gate the verdict** unless `--strict` — false positives can't break CI trust |
 | **Evidence + judgment** | 2.4.6 headings · 3.3.2 label adequacy · 1.4.1 color use · 3.3.3/3.3.7 flows · 1.2.5 media accuracy | Evidence packets collected (headings, labels+controls, tab-order trace, media inventory); judged by a human in the review UI, the evaluator skill, or `--llm` |
 
-`--llm [model]` (needs `ANTHROPIC_API_KEY`) adjudicates the judgment criteria from the evidence packets and auto-merges the result as reviewer `llm:<model>` — low-confidence verdicts become `needs-expert`, provenance is preserved, and an LLM disposition is never silently equivalent to human sign-off. `--interact` enables the state-changing probes (staging only). `data-a11y-eval-ignore` on an element excludes its text from the sensory/language checks — for pages quoting arbitrary content (the review UI uses it on itself).
+`--llm [provider/model]` adjudicates the judgment criteria from the evidence packets and auto-merges the result as reviewer `llm:<model>` — **any backend**: `anthropic/…`, `openai/…`, `gemini/…`, `groq/…`, `ollama/…` (local, keyless), or `openai-compat/…` + `A11Y_LLM_BASE_URL` for any Chat Completions endpoint (keys via the provider's env var, `A11Y_LLM_API_KEY`, or gitignored `optimizer/.env`) — low-confidence verdicts become `needs-expert`, provenance is preserved, and an LLM disposition is never silently equivalent to human sign-off. `--interact` enables the state-changing probes (staging only). `data-a11y-eval-ignore` on an element excludes its text from the sensory/language checks — for pages quoting arbitrary content (the review UI uses it on itself).
 
 ## Human review UI
 
@@ -179,7 +179,10 @@ python3 optimizer/optimize.py --dry-run                    # verify the loop, ze
 pip install -r optimizer/requirements.txt                  # dspy, for real runs
 python3 optimizer/optimize.py --auto light --apply         # optimize on the fixtures
 python3 optimizer/optimize.py --auto light --page snapshots/checkout.html --apply   # specialize for YOUR repo
+python3 optimizer/optimize.py --target adjudicator --auto light --apply             # optimize the evaluator's judgment too
 ```
+
+Both targets emit a **complete installable skill package** (`optimizer/out/<skill-name>/SKILL.md`, provenance + before/after score in frontmatter), and any litellm provider works via `--model` (`openai/…`, `gemini/…`, `ollama_chat/…`, …) with keys in gitignored `optimizer/.env`.
 
 See **[docs/skill-optimization.md](docs/skill-optimization.md)** for how the loop works, costs, and bring-your-own-repo training. `agents/skill-optimizer.md` is an agent that runs the whole flow (baseline → snapshot → optimize → prove the delta) for a given repo.
 

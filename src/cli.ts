@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -37,8 +38,13 @@ Evaluate options:
                          to carry its manual review forward into the review UI.
   --strict               Promote machine-flagged suspects into scoring and the verdict gate.
   --interact             Run state-changing probes (change inputs, open dialogs). STAGING ONLY.
-  --llm [model]          Adjudicate the manual checklist with an LLM (needs ANTHROPIC_API_KEY;
-                         default model ${DEFAULT_ADJUDICATION_MODEL}) and auto-merge the result.
+  --llm [model]          Adjudicate the manual checklist with an LLM and auto-merge the result.
+                         Any provider via "provider/model": anthropic/…, openai/…, gemini/…,
+                         groq/…, mistral/…, deepseek/…, xai/…, openrouter/…, ollama/… (local,
+                         keyless), or openai-compat/… + A11Y_LLM_BASE_URL for any Chat
+                         Completions endpoint. Keys from the provider's usual env var or
+                         A11Y_LLM_API_KEY; optimizer/.env is loaded automatically.
+                         Default model: ${DEFAULT_ADJUDICATION_MODEL} (Anthropic).
   --out <dir>            Output directory (default: a11y-report).
                          Writes report.json + report.md + review.html.
   --json                 Print the JSON report to stdout.
@@ -122,6 +128,21 @@ const parseArgs = (argv: string[]): CliArgs => {
     else throw new Error(`Unknown argument: ${arg}\n\n${USAGE}`)
   }
   return args
+}
+
+/** setdefault-loads KEY=VALUE lines so API keys can live in gitignored env files, never in chat or shell profiles. */
+const loadEnvFiles = (): void => {
+  for (const file of ['optimizer/.env', '.env']) {
+    const path = resolve(file)
+    if (!existsSync(path)) continue
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
+      const eq = trimmed.indexOf('=')
+      const key = trimmed.slice(0, eq).trim()
+      if (!(key in process.env)) process.env[key] = trimmed.slice(eq + 1).trim().replace(/^['"]|['"]$/g, '')
+    }
+  }
 }
 
 const loadReport = async (reportDir: string): Promise<Report> =>
@@ -274,6 +295,7 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
     await writeFile(join(outDir, 'review.html'), renderReviewHtml(report, { served: false, manual: priorManual }))
 
     if (args.llm) {
+      loadEnvFiles()
       console.error(`LLM adjudication with ${args.llm}…`)
       const review = await adjudicate(report, args.llm)
       const merged = mergeManualReview(report, review)

@@ -3,6 +3,14 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.9.0] - 2026-08-31
+
+### Added
+
+- **Any LLM provider as backend.** CLI `--llm` now takes `provider/model` — Anthropic Messages wire for `anthropic/…`, OpenAI Chat Completions wire for `openai/…`, `gemini/…`, `groq/…`, `mistral/…`, `deepseek/…`, `xai/…`, `openrouter/…`, `ollama/…` (local, keyless), and `openai-compat/<model>` + `A11Y_LLM_BASE_URL` for any compatible endpoint (vLLM, LM Studio, gateways). Keys via the provider's usual env var or `A11Y_LLM_API_KEY`; gitignored `optimizer/.env` / `.env` loaded automatically. The optimizer accepts any litellm `--model` likewise.
+- **The optimization outcome is a skill.** Both optimizer targets emit a complete installable package to `optimizer/out/<skill-name>/SKILL.md` — full skill, optimized block spliced, provenance frontmatter (`optimized-at/model/target/score` with before→after trainset average from evaluating seed vs optimized). `--apply` promotes the package to the live skill.
+- CI: skill-package emission check; provider-resolution unit tests (70 total).
+
 ## [0.8.0] - 2026-08-31
 
 ### Added

@@ -68,6 +68,68 @@ def write_optimized_instructions(skill_path: Path, instructions: str) -> None:
     skill_path.write_text(updated, encoding="utf-8")
 
 
+FRONTMATTER_RE = re.compile(r"^(---\n)(.*?)(\n---\n)", re.S)
+
+
+def emit_skill_package(skill_path: Path, instructions: str, meta: dict[str, str], out_root: Path) -> Path:
+    """The optimization outcome is a complete, installable skill: the full SKILL.md
+    with the optimized block spliced in and provenance recorded in frontmatter."""
+    content = skill_path.read_text(encoding="utf-8")
+    content = MARKER_RE.sub(lambda m: f"{m.group(1)}\n{instructions.strip()}\n{m.group(3)}", content, count=1)
+
+    fm = FRONTMATTER_RE.match(content)
+    if fm:
+        body = fm.group(2)
+        for key, value in meta.items():
+            line = f"{key}: {value}"
+            key_re = re.compile(rf"^{re.escape(key)}:.*$", re.M)
+            body = key_re.sub(line, body) if key_re.search(body) else body + "\n" + line
+        content = fm.group(1) + body + fm.group(3) + content[fm.end():]
+
+    out_dir = out_root / skill_path.parent.name
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "SKILL.md"
+    out_path.write_text(content, encoding="utf-8")
+    return out_path
+
+
+def evaluate_program(program, trainset, gepa_metric) -> float:
+    """Average metric score of a program over the trainset (for before/after provenance)."""
+    import dspy
+
+    plain_metric = lambda gold, pred, trace=None: float(gepa_metric(gold, pred).score)
+    result = dspy.Evaluate(devset=trainset, metric=plain_metric, num_threads=1, display_progress=False)(program)
+    return round(float(result.score) / 100, 3)
+
+
+def finish_run(args, skill_path: Path, program, optimized, trainset, gepa_metric, target: str, notes_path: Path) -> int:
+    from datetime import datetime, timezone
+
+    print("scoring seed vs optimized on the trainset…")
+    before = evaluate_program(program, trainset, gepa_metric)
+    after = evaluate_program(optimized, trainset, gepa_metric)
+
+    instructions = optimized.predictors()[0].signature.instructions
+    notes_path.write_text(instructions, encoding="utf-8")
+
+    meta = {
+        "optimized-at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "optimized-model": args.model,
+        "optimized-target": target,
+        "optimized-score": f'"{before} -> {after} (trainset avg, n={len(trainset)})"',
+    }
+    package = emit_skill_package(skill_path, instructions, meta, ROOT / "optimizer" / "out")
+    print(f"\nOUTCOME — optimized skill package: {package}")
+    print(f"trainset score: {before} -> {after}")
+
+    if args.apply:
+        skill_path.write_text(package.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"applied: {skill_path} now carries the optimized instructions + provenance frontmatter.")
+    else:
+        print(f"install it with --apply, or copy {package.parent} into ~/.claude/skills/ as-is.")
+    return 0
+
+
 def dry_run() -> int:
     print("dry run: exercising the metric leg (no LM calls)…")
     flawed = (ROOT / "test-fixtures" / "site" / "flawed.html").read_text(encoding="utf-8")
@@ -129,18 +191,7 @@ def optimize_adjudicator(args: argparse.Namespace) -> int:
         track_stats=True,
     )
     optimized = optimizer.compile(program, trainset=trainset, valset=trainset)
-
-    instructions = optimized.predictors()[0].signature.instructions
-    out_path = ROOT / "optimizer" / "optimized-judgment-instructions.md"
-    out_path.write_text(instructions, encoding="utf-8")
-    print(f"\noptimized judgment instructions saved to {out_path}")
-
-    if args.apply:
-        write_optimized_instructions(skill_path, instructions)
-        print(f"spliced into {skill_path} — --llm adjudication now uses them at runtime.")
-    else:
-        print("run again with --apply to write them into the evaluator skill.")
-    return 0
+    return finish_run(args, skill_path, program, optimized, trainset, gepa_metric, "adjudicator", ROOT / "optimizer" / "optimized-judgment-instructions.md")
 
 
 def optimize(args: argparse.Namespace) -> int:
@@ -182,19 +233,7 @@ def optimize(args: argparse.Namespace) -> int:
         track_stats=True,
     )
     optimized = optimizer.compile(program, trainset=trainset, valset=trainset)
-
-    instructions = optimized.predictors()[0].signature.instructions
-    out_path = ROOT / "optimizer" / "optimized-instructions.md"
-    out_path.write_text(instructions, encoding="utf-8")
-    print(f"\noptimized instructions saved to {out_path}")
-
-    if args.apply:
-        write_optimized_instructions(Path(args.skill), instructions)
-        print(f"spliced into {args.skill} between the OPTIMIZED-INSTRUCTIONS markers.")
-        print("Review the diff, then re-run the fixer on a fixture to confirm the improvement before committing.")
-    else:
-        print("run again with --apply to write them into the skill (or splice manually after review).")
-    return 0
+    return finish_run(args, Path(args.skill), program, optimized, trainset, gepa_metric, "fixer", ROOT / "optimizer" / "optimized-instructions.md")
 
 
 def main() -> int:

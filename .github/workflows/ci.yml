@@ -123,6 +123,18 @@ jobs:
       - name: Optimizer — adjudicator gold-label metric dry run
         run: python3 optimizer/optimize.py --target adjudicator --dry-run
 
+      - name: Optimizer — skill-package emission (outcome is an installable skill)
+        run: |
+          python3 - <<'PYEOF'
+          import sys; sys.path.insert(0, 'optimizer')
+          from pathlib import Path
+          from optimize import emit_skill_package
+          out = emit_skill_package(Path('skills/a11y-fixer/SKILL.md'), 'CI OPTIMIZED BLOCK', {'optimized-model': 'ci-test'}, Path('/tmp/emit'))
+          text = out.read_text()
+          assert 'CI OPTIMIZED BLOCK' in text and 'optimized-model: ci-test' in text and text.startswith('---\nname: a11y-fixer')
+          print('emission OK:', out)
+          PYEOF
+
       - name: Integration — baseline diff classifies fixed findings
         run: |
           node src/cli.ts --url test-fixtures/site/page2.html --baseline /tmp/r-crawl/report.json --out /tmp/r-baseline || true

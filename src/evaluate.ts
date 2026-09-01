@@ -16,7 +16,7 @@ import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict, par
 import type { BaselineDiff, EvaluateOptions, EvidencePacket, Finding, PageResult, Report } from './types.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from './wcag.ts'
 
-export const VERSION = '0.8.0'
+export const VERSION = '0.9.0'
 
 const DEFAULT_MAX_PAGES = 15
 const DEFAULT_MAX_DEPTH = 3

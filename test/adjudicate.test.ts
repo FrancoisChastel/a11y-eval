@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { buildAdjudicationPrompt, parseAdjudication } from '../src/engines/adjudicate.ts'
+import { buildAdjudicationPrompt, parseAdjudication, resolveBackend } from '../src/engines/adjudicate.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from '../src/wcag.ts'
 import type { Report } from '../src/types.ts'
 
@@ -33,6 +33,42 @@ describe('buildAdjudicationPrompt', () => {
     expect(prompt).toContain('WCAG 2.4.6')
     expect(prompt).toContain('"needs-expert"')
     expect(prompt).toContain('prefer needs-expert over a guessed pass')
+  })
+})
+
+describe('resolveBackend', () => {
+  test('bare model names default to Anthropic (back-compat)', () => {
+    const b = resolveBackend('claude-haiku-4-5-20251001', { ANTHROPIC_API_KEY: 'k' })
+    expect(b).toMatchObject({ wire: 'anthropic', model: 'claude-haiku-4-5-20251001', apiKey: 'k' })
+    expect(b.baseUrl).toBe('https://api.anthropic.com')
+  })
+
+  test('provider prefixes select wire, endpoint, and key env var', () => {
+    expect(resolveBackend('openai/gpt-5-mini', { OPENAI_API_KEY: 'ok' })).toMatchObject({
+      wire: 'openai',
+      model: 'gpt-5-mini',
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: 'ok',
+    })
+    expect(resolveBackend('gemini/gemini-2.5-flash', { GEMINI_API_KEY: 'gk' }).apiKey).toBe('gk')
+    expect(resolveBackend('openrouter/meta-llama/llama-4', { OPENROUTER_API_KEY: 'r' }).model).toBe('meta-llama/llama-4')
+  })
+
+  test('ollama is keyless and local', () => {
+    const b = resolveBackend('ollama/llama3.1', {})
+    expect(b).toMatchObject({ wire: 'openai', apiKey: undefined, keyEnv: null })
+    expect(b.baseUrl).toContain('11434')
+  })
+
+  test('A11Y_LLM_BASE_URL and A11Y_LLM_API_KEY override any provider', () => {
+    const b = resolveBackend('openai-compat/local-model', { A11Y_LLM_BASE_URL: 'http://gpu-box:8000/v1/', A11Y_LLM_API_KEY: 'x' })
+    expect(b.baseUrl).toBe('http://gpu-box:8000/v1')
+    expect(b.apiKey).toBe('x')
+  })
+
+  test('unknown provider and missing base url raise actionable errors', () => {
+    expect(() => resolveBackend('notaprovider/model', {})).toThrow(/Supported:/)
+    expect(() => resolveBackend('openai-compat/model', {})).toThrow(/A11Y_LLM_BASE_URL/)
   })
 })
 
