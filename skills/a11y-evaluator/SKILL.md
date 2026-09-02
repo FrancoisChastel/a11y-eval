@@ -14,6 +14,10 @@ You are performing an accessibility evaluation. It has two mandatory halves:
 
 **Iron rule: never claim "WCAG 2.2 AA compliant".** The strongest legitimate conclusion is: "no known violations; automated checks pass and the manual criteria were reviewed with the evidence below."
 
+Grounding from the literature (see docs/research/wcag-automation-literature.md): W3C ACT outcomes are asymmetric — fails prove non-conformance, passes prove nothing; reliable automation is estimated at ~13% of success criteria. Findings carry this vocabulary as `actOutcome`: violations `failed`, suspects `incomplete`.
+
+**WCAG-EM correspondence.** This process approximates W3C's evaluation methodology: scope → your Phase 1 invocation; explore/sample → crawl + seed selection (crawling is *convenience* sampling — say so whenever the evaluation is meant to represent a whole site); audit the sample → Phases 1–3; report → Phase 4. For site-level statements, seed a representative page set (templates, key flows, states), not just what the crawler reaches.
+
 ## When to Activate
 
 - "Evaluate / audit / review the accessibility of <app | url | repo | PR>"

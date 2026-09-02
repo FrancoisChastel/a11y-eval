@@ -94,3 +94,12 @@ describe('computeVerdict', () => {
     expect(computeVerdict({ critical: 0, serious: 0, moderate: 0, minor: 3 })).toBe('pass-with-issues')
   })
 })
+
+describe('actOutcomeFor (ACT/EARL vocabulary)', () => {
+  test('suspects are incomplete, everything else failed', async () => {
+    const { actOutcomeFor } = await import('../src/scoring.ts')
+    expect(actOutcomeFor({ confidence: 'suspect' })).toBe('incomplete')
+    expect(actOutcomeFor({ confidence: 'violation' })).toBe('failed')
+    expect(actOutcomeFor({})).toBe('failed')
+  })
+})

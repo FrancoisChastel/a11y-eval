@@ -111,6 +111,13 @@ export interface Finding {
   confidence?: FindingConfidence
   /** Evidence artifact paths (screenshots) captured for this finding. */
   evidence?: string[]
+  /**
+   * W3C ACT/EARL outcome vocabulary: violations map to 'failed' (proves the
+   * requirement is NOT satisfied); suspects map to 'incomplete' (applicability
+   * determined automatically, expectation needs human judgment). Per ACT, a
+   * clean run demonstrates absence of detected failures — never conformance.
+   */
+  actOutcome?: 'failed' | 'incomplete'
 }
 
 export type FindingConfidence = 'violation' | 'suspect'

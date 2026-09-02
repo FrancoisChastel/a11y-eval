@@ -16,11 +16,11 @@ import { runVlmChecks } from './engines/vlm.ts'
 import { runCcaContrast } from './engines/contrast.ts'
 import { runScreenReader } from './engines/screenReader.ts'
 import { buildRemediationPlan } from './remediations.ts'
-import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict, partitionFindings } from './scoring.ts'
+import { actOutcomeFor, computeScore, computeScoreBreakdown, computeTotals, computeVerdict, partitionFindings } from './scoring.ts'
 import type { BaselineDiff, EvaluateOptions, EvidencePacket, Finding, PageResult, Report } from './types.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from './wcag.ts'
 
-export const VERSION = '0.12.0'
+export const VERSION = '0.13.0'
 
 const DEFAULT_MAX_PAGES = 15
 const DEFAULT_MAX_DEPTH = 3
@@ -156,7 +156,7 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
     await browser.close()
   }
 
-  let findings = [...pages.flatMap((p) => p.findings), ...staticFindings]
+  let findings: Finding[] = [...pages.flatMap((p) => p.findings), ...staticFindings].map((f) => ({ ...f, actOutcome: actOutcomeFor(f) }))
 
   let baselineDiff: BaselineDiff | undefined
   if (options.baselinePath) {

@@ -3,6 +3,12 @@
 All notable changes to a11y-eval are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/) · Versioning: [SemVer](https://semver.org/).
 
+## [0.13.0] - 2026-09-01
+
+### Added
+
+- **Literature-grounded honesty pass** (see `docs/research/wcag-automation-literature.md`): findings carry the W3C ACT/EARL outcome vocabulary (`actOutcome`: violations `failed`, suspects `incomplete` — the standards-track analog of the confidence tier); the coverage note cites published figures (~44% automatable / ~13% reliable / ~1/6 of criteria reported in practice) plus the ACT pass-asymmetry; report.md's score breakdown gains a score-honesty block (weights are engineering judgment, score inherits tool coverage, same-site regression tracking only); crawl gaps state that crawling is convenience sampling, not WCAG-EM representative sampling; the evaluator skill documents its WCAG-EM correspondence.
+
 ## [0.12.0] - 2026-09-01
 
 ### Added

@@ -105,7 +105,7 @@ const gaps = (report: Report): string[] => {
     items.push(`${suspects.length} machine-flagged suspect(s) (${scs}) are not counted in the verdict — confirm or dismiss them in the review.`)
   }
   if (report.meta?.crawled) {
-    items.push('Only crawl-reachable pages were evaluated — SPA-only routes, auth-gated pages, and form-flow steps need explicit --url seeds.')
+    items.push('Only crawl-reachable pages were evaluated — SPA-only routes, auth-gated pages, and form-flow steps need explicit --url seeds. This is convenience sampling, not the representative sampling WCAG-EM prescribes for site-level conformance claims.')
   }
   return [`## Gaps — what this report does NOT cover`, '', ...items.map((i) => `- ${i}`), '']
 }
@@ -149,6 +149,8 @@ export const renderMarkdown = (report: Report): string => {
       `## Score breakdown`,
       '',
       `${scoreBar(report.score)} **${report.score}/100** — starts at 100; deductions weighted by impact (critical −15, serious −10, moderate −3, minor −1), capped at 5 counted instances per rule per page so one systemic issue reads as one problem.`,
+      '',
+      `> Score honesty (per W3C's accessibility-metrics research): the weights are engineering judgment, not user-impact-validated; the score inherits this tool's automated coverage and is **not comparable across sites or tools**. Its supported use is baseline-to-baseline regression tracking on the same site — gate on the verdict, never the score.`,
       '',
       `| Rule | Engine | Impact | Instances (counted) | Points |`,
       `|---|---|---|---|---|`,

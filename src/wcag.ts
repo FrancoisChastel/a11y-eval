@@ -58,4 +58,4 @@ export const MANUAL_CHECKLIST: ManualCheckItem[] = [
 ]
 
 export const COVERAGE_NOTE =
-  'Automated checks cover roughly 30-50% of WCAG 2.2 AA. A "pass" verdict means no automated violations were found — it is not a compliance claim. The manualChecklist criteria require human or agent review.'
+  'Coverage honesty: the literature estimates ~44% of WCAG success criteria are automatable and only ~13% reliably so, and in practice tools report violations on about one sixth of all criteria (Universal Access Inf. Soc. 2025; Abu Doush et al.). Per W3C ACT, rule outcomes are asymmetric: a fail proves non-conformance, but a clean automated run only demonstrates absence of detected failures — never conformance. The manualChecklist criteria require human or agent review.'

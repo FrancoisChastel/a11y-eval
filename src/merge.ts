@@ -12,6 +12,7 @@ const manualItemToFinding = (item: ManualReview['items'][number], fallbackPage: 
     description: item.evidence || `Manual review failed WCAG ${item.sc}.`,
     page,
     targets: item.screenshots ?? [],
+    actOutcome: 'failed' as const,
   }))
 }
 

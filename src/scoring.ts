@@ -22,6 +22,10 @@ const IMPACT_WEIGHT: Record<Impact, number> = {
 /** Instances of the same rule on the same page counted toward the score. */
 const INSTANCE_CAP = 5
 
+/** ACT/EARL outcome for a finding: suspect → 'incomplete', otherwise 'failed'. */
+export const actOutcomeFor = (f: Pick<Finding, 'confidence'>): 'failed' | 'incomplete' =>
+  f.confidence === 'suspect' ? 'incomplete' : 'failed'
+
 export const computeTotals = (findings: Finding[]): Record<Impact, number> => {
   const totals: Record<Impact, number> = { critical: 0, serious: 0, moderate: 0, minor: 0 }
   for (const f of findings) totals[f.impact] += 1
