@@ -7,6 +7,7 @@ import {
   normalizePageLang,
   type TargetBox,
 } from '../src/checks.ts'
+import { composeNarration } from '../src/engines/screenReader.ts'
 
 const box = (over: Partial<TargetBox>): TargetBox => ({
   selector: 'a',
@@ -105,8 +106,7 @@ describe('normalizePageLang (3.1.2)', () => {
 })
 
 describe('composeNarration (screen-reader simulation)', () => {
-  test('speaks roles, names, heading levels, states, and flags unnamed controls', async () => {
-    const { composeNarration } = await import('../src/engines/screenReader.ts')
+  test('speaks roles, names, heading levels, states, and flags unnamed controls', () => {
     const phrases = composeNarration([
       { nodeId: '1', ignored: false, role: { value: 'RootWebArea' }, name: { value: 'Page' }, childIds: ['2', '3', '4', '5', '6'] },
       { nodeId: '2', ignored: false, role: { value: 'heading' }, name: { value: 'Billing' }, properties: [{ name: 'level', value: { value: 2 } }] },

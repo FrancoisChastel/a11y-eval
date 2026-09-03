@@ -61,4 +61,20 @@ describe('renderMarkdown', () => {
     expect(md).toContain('a \\| b')
     expect(md).toContain('x \\| y')
   })
+
+  test('lists every engine that contributed to the report', () => {
+    const withExtendedEngines: Report = {
+      ...report,
+      meta: { staticScan: 'bundled-a11y', vlm: 'openai-compat/mock' },
+      findings: [
+        ...report.findings,
+        { engine: 'cca', ruleId: 'cca-contrast', impact: 'serious', wcag: ['1.4.3'], description: 'Measured contrast', page: 'p', targets: ['.hero'] },
+        { engine: 'vlm', ruleId: 'vlm-alt-quality-suspect', impact: 'serious', wcag: ['1.1.1'], description: 'Weak alt', page: 'p', targets: ['img'] },
+      ],
+    }
+
+    expect(renderMarkdown(withExtendedEngines)).toContain(
+      '| **Engines** | axe · cca · keyboard · vlm · static (bundled-a11y) |',
+    )
+  })
 })

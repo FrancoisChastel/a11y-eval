@@ -18,15 +18,21 @@ export const collectSignals = async (page: Page): Promise<ContentSignals> =>
       return lang !== '' && lang !== pageLang
     }).length
 
+    const describedHoverContent = Array.from(document.querySelectorAll('[aria-describedby]')).filter((el) =>
+      (el.getAttribute('aria-describedby') ?? '')
+        .split(/\s+/)
+        .some((id) => document.getElementById(id)?.getAttribute('role') === 'tooltip'),
+    ).length
     const hoverContent =
       count('[title]:not(iframe):not(html)') +
       count('[aria-haspopup]') +
-      count('[data-tooltip], [data-tippy-content], [popovertarget]')
+      count('[data-tooltip], [data-tippy-content], [popovertarget]') +
+      describedHoverContent
 
     return {
       media: count('video, audio') + count('iframe[src*="youtube"], iframe[src*="vimeo"], iframe[src*="player"]'),
       forms: count('input:not([type="hidden"]), select, textarea, [contenteditable="true"]'),
-      drag: count('[draggable="true"], input[type="range"]'),
+      drag: count('[draggable="true"], input[type="range"], [role="slider"]'),
       hoverContent,
       langParts,
       iframes: count('iframe'),

@@ -24,7 +24,15 @@ const SIGNAL_LABELS: Record<keyof ContentSignals, string> = {
 
 const atAGlance = (report: Report): string[] => {
   const engines = new Set(report.findings.map((f) => f.engine))
-  const enginesRan = ['axe', 'keyboard', ...(report.meta?.staticScan && report.meta.staticScan !== 'none' ? [`static (${report.meta.staticScan})`] : [])]
+  const enginesRan = [
+    'axe',
+    ...(engines.has('cca') || report.evidence?.some((packet) => packet.kind === 'cca') ? ['cca'] : []),
+    'keyboard',
+    ...(engines.has('vlm') || report.meta?.vlm ? ['vlm'] : []),
+    ...(engines.has('static') || (report.meta?.staticScan && report.meta.staticScan !== 'none')
+      ? [`static${report.meta?.staticScan && report.meta.staticScan !== 'none' ? ` (${report.meta.staticScan})` : ''}`]
+      : []),
+  ]
   const manualState = !report.manualReview
     ? 'not started — open review.html or run the a11y-evaluator skill'
     : report.manualChecklist.every((c) => report.manualReview?.items.some((i) => i.sc === c.sc))

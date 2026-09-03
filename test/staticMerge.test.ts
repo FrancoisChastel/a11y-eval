@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { eslintReportToFindings } from '../src/engines/staticMerge.ts'
+import { dedupeStaticFindings } from '../src/repo/staticScan.ts'
 
 const eslintReport = [
   {
@@ -45,8 +46,7 @@ describe('eslintReportToFindings', () => {
 })
 
 describe('dedupeStaticFindings', () => {
-  test('same location + rule from two scanners collapses to one; different survive', async () => {
-    const { dedupeStaticFindings } = await import('../src/repo/staticScan.ts')
+  test('same location + rule from two scanners collapses to one; different survive', () => {
     const f = (ruleId: string, target: string) => ({
       engine: 'static' as const, ruleId, impact: 'moderate' as const, wcag: [],
       description: 'd', page: '/app/src/A.tsx', targets: [target],
