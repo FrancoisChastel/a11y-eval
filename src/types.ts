@@ -236,6 +236,8 @@ export interface EvaluateOptions {
   interact?: boolean
   /** Directory where evidence screenshots are written (enables screenshot capture). */
   evidenceDir?: string
+  /** Playwright storage-state JSON file used to restore an authenticated browser session. */
+  storageStatePath?: string
   /** provider/model for vision checks; enables the --vlm tier. */
   vlm?: string
   /** Screen-reader pass: 'axtree' (simulation, cross-platform) | 'nvda' | 'voiceover'. */

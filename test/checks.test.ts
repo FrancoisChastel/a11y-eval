@@ -70,6 +70,14 @@ describe('findOrderJumps (2.4.3)', () => {
     ])
     expect(jumps).toEqual([])
   })
+
+  test('ignores upward differences smaller than one target-size row', () => {
+    const jumps = findOrderJumps([
+      { selector: '#lower-edge', x: 0, y: 100, height: 20 },
+      { selector: '#slightly-higher', x: 200, y: 68, height: 20 },
+    ])
+    expect(jumps).toEqual([])
+  })
 })
 
 describe('findSensoryPhrases (1.3.3)', () => {

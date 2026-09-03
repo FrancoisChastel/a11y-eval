@@ -34,6 +34,7 @@ Evaluate options:
   --max-depth <n>        Crawl depth cap (default 3).
   --no-static            Skip the static source scan in repo mode.
   --static-report <path> Merge an existing ESLint JSON report instead of scanning.
+  --storage-state <path> Playwright storage-state JSON file for an authenticated browser session.
   --baseline <path>      Previous report.json to diff against (new/fixed/persisting) and
                          to carry its manual review forward into the review UI.
   --strict               Promote machine-flagged suspects into scoring and the verdict gate.
@@ -97,6 +98,7 @@ interface CliArgs {
   maxDepth?: number
   noStatic: boolean
   staticReportPath?: string
+  storageStatePath?: string
   baselinePath?: string
   manualPath?: string
   reportDir: string
@@ -129,6 +131,7 @@ const parseArgs = (argv: string[]): CliArgs => {
     else if (arg === '--max-depth') args.maxDepth = Number(next(++i, '--max-depth'))
     else if (arg === '--no-static') args.noStatic = true
     else if (arg === '--static-report') args.staticReportPath = next(++i, '--static-report')
+    else if (arg === '--storage-state') args.storageStatePath = resolve(next(++i, '--storage-state'))
     else if (arg === '--baseline') args.baselinePath = resolve(next(++i, '--baseline'))
     else if (arg === '--strict') args.strict = true
     else if (arg === '--interact') args.interact = true
@@ -291,6 +294,7 @@ const runEvaluate = async (args: CliArgs): Promise<void> => {
       maxDepth: args.maxDepth,
       staticReportPath: args.staticReportPath,
       staticFindings,
+      storageStatePath: args.storageStatePath,
       baselinePath: args.baselinePath,
       strict: args.strict,
       interact: args.interact,

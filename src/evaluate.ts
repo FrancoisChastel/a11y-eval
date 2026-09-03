@@ -75,7 +75,10 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
   const evidence: EvidencePacket[] = []
   let urls = options.urls
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      ...(options.storageStatePath ? { storageState: options.storageStatePath } : {}),
+    })
 
     if (options.crawl) {
       urls = await discoverPages(context, options.urls, {

@@ -53,6 +53,25 @@ export interface WorstContrast {
   samples: number
 }
 
+/** Keeps background pixels changed by rendering text and makes every other pixel transparent. */
+export const pixelsUnderRenderedText = (
+  background: Uint8Array | Buffer,
+  rendered: Uint8Array | Buffer,
+  minRgbDelta = 12,
+): Uint8Array => {
+  if (background.length !== rendered.length) throw new RangeError('Rendered and background samples must have equal dimensions')
+
+  const sampled = Uint8Array.from(background)
+  for (let i = 0; i < sampled.length; i += 4) {
+    const delta =
+      Math.abs(rendered[i] - background[i]) +
+      Math.abs(rendered[i + 1] - background[i + 1]) +
+      Math.abs(rendered[i + 2] - background[i + 2])
+    if (delta < minRgbDelta) sampled[i + 3] = 0
+  }
+  return sampled
+}
+
 /**
  * Contrast of a foreground color against every opaque pixel of a background
  * sample (RGBA buffer), returning the worst case — "contrast at its worst

@@ -66,6 +66,7 @@ Outputs to `--out` (default `a11y-report/`): `report.json` (agent contract), `re
 --max-pages <n>        Crawl cap (default 15).      --max-depth <n>  Depth cap (default 3).
 --no-static            Skip the bundled static scan.
 --static-report <path> Merge an existing ESLint JSON report (eslint -f json).
+--storage-state <path> Playwright storage-state JSON file for an authenticated browser session.
 --baseline <path>      Previous report.json — classifies findings new/persisting/fixed
                        and carries its manual review forward into review.html.
 --strict               Promote machine-flagged suspects into scoring and the verdict gate.

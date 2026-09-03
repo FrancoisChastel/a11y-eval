@@ -71,6 +71,8 @@ export interface OrderJump {
   upwardBy: number
 }
 
+const MIN_ORDER_JUMP = 24
+
 /**
  * WCAG 2.4.3 heuristic: tab order should broadly follow reading order. A stop
  * whose element sits entirely ABOVE the previous stop is a strong out-of-order
@@ -83,7 +85,9 @@ export const findOrderJumps = (stops: FocusStop[]): OrderJump[] => {
     const prev = stops[i - 1]
     const next = stops[i]
     const upwardBy = prev.y - (next.y + next.height)
-    if (upwardBy > 0) jumps.push({ from: prev.selector, to: next.selector, upwardBy: Math.round(upwardBy) })
+    if (upwardBy >= MIN_ORDER_JUMP) {
+      jumps.push({ from: prev.selector, to: next.selector, upwardBy: Math.round(upwardBy) })
+    }
   }
   return jumps
 }
