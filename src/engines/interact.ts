@@ -15,6 +15,7 @@ const SETTLE_MS = 600
 export const runInteractProbes = async (page: Page, url: string): Promise<Finding[]> => {
   const findings: Finding[] = []
   const startUrl = page.url()
+  const startLocation = new URL(startUrl)
 
   // --- 3.2.2: change each discrete input, watch for navigation ---
   const inputSelectors = await page.evaluate((max) => {
@@ -44,13 +45,19 @@ export const runInteractProbes = async (page: Page, url: string): Promise<Findin
         await locator.setChecked(true)
       }
       await page.waitForTimeout(SETTLE_MS)
-      if (page.url() !== startUrl) {
+      const currentUrl = page.url()
+      const currentLocation = new URL(currentUrl)
+      const changedContext =
+        currentLocation.origin !== startLocation.origin ||
+        currentLocation.pathname !== startLocation.pathname ||
+        currentLocation.hash !== startLocation.hash
+      if (changedContext) {
         findings.push({
           engine: 'keyboard',
           ruleId: 'on-input-context-change',
           impact: 'serious',
           wcag: ['3.2.2'],
-          description: `Changing this input navigated to ${page.url()} without prior warning — value changes must not change context.`,
+          description: `Changing this input navigated to ${currentUrl} without prior warning — value changes must not change context.`,
           page: url,
           targets: [selector],
         })

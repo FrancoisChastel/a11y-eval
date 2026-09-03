@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { computeScore, computeScoreBreakdown, computeTotals, computeVerdict } from '../src/scoring.ts'
+import { actOutcomeFor, computeScore, computeScoreBreakdown, computeTotals, computeVerdict } from '../src/scoring.ts'
 import type { Finding } from '../src/types.ts'
 
 const finding = (impact: Finding['impact'], ruleId = 'r', page = 'p'): Finding => ({
@@ -96,8 +96,7 @@ describe('computeVerdict', () => {
 })
 
 describe('actOutcomeFor (ACT/EARL vocabulary)', () => {
-  test('suspects are incomplete, everything else failed', async () => {
-    const { actOutcomeFor } = await import('../src/scoring.ts')
+  test('suspects are incomplete, everything else failed', () => {
     expect(actOutcomeFor({ confidence: 'suspect' })).toBe('incomplete')
     expect(actOutcomeFor({ confidence: 'violation' })).toBe('failed')
     expect(actOutcomeFor({})).toBe('failed')

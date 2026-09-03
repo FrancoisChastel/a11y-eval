@@ -7,6 +7,9 @@ import { createServer } from 'node:http'
 const port = Number(process.argv[2] ?? 4941)
 
 const respond = (promptText, imageCount) => {
+  if (promptText.includes('adjudicating')) {
+    return '[{"sc": "2.4.6", "status": "pass", "confidence": "high", "evidence": "headings describe sections"}]'
+  }
   if (promptText.includes('alt text conveys') || promptText.includes('ADEQUACY')) {
     return JSON.stringify(
       Array.from({ length: imageCount }, (_, index) => ({
@@ -37,9 +40,6 @@ const respond = (promptText, imageCount) => {
   }
   if (promptText.includes('frame of a video')) {
     return '{"description": "a person speaking to camera with on-screen text", "looksLikeContent": true}'
-  }
-  if (promptText.includes('adjudicating')) {
-    return '[{"sc": "2.4.6", "status": "pass", "confidence": "high", "evidence": "headings describe sections"}]'
   }
   return '{"issues": []}'
 }

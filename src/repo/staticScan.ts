@@ -7,7 +7,7 @@ import type { RepoInfo } from './detect.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FALLBACK_CONFIG = join(HERE, 'fallback-eslint.config.mjs')
-const BUNDLED_ESLINT = join(HERE, '..', '..', 'node_modules', '.bin', 'eslint')
+const BUNDLED_ESLINT = join(HERE, '..', '..', 'node_modules', 'eslint', 'bin', 'eslint.js')
 
 export type StaticScanMode = 'bundled-a11y' | 'bundled+repo-eslint' | 'repo-eslint' | 'skipped'
 
@@ -54,8 +54,8 @@ export const runStaticScan = (repoDir: string, info: RepoInfo): StaticScanResult
   let bundledFindings: Finding[] | null = null
   let bundledNote: string | undefined
   const bundled = runEslint(
-    BUNDLED_ESLINT,
-    ['--config', FALLBACK_CONFIG, '--no-error-on-unmatched-pattern', '--format', 'json', ...info.sourceDirs],
+    process.execPath,
+    [BUNDLED_ESLINT, '--config', FALLBACK_CONFIG, '--no-error-on-unmatched-pattern', '--format', 'json', ...info.sourceDirs],
     repoDir,
   )
   if ((bundled.status === 0 || bundled.status === 1) && bundled.stdout) {

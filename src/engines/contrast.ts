@@ -1,6 +1,6 @@
 import { PNG } from 'pngjs'
 import type { Page } from 'playwright'
-import { judgeContrast, parseCssColor, requiredRatio, worstCaseContrast } from '../contrastMath.ts'
+import { judgeContrast, parseCssColor, pixelsUnderRenderedText, requiredRatio, worstCaseContrast } from '../contrastMath.ts'
 import type { EvidencePacket, Finding } from '../types.ts'
 import type { AxeIncompleteItem } from './axe.ts'
 
@@ -26,7 +26,7 @@ export const runCcaContrast = async (page: Page, url: string, incompleteItems: A
   if (items.length === 0) return result
 
   const resolved: string[] = []
-  for (const item of items) {
+  for (const [itemIndex, item] of items.entries()) {
     try {
       const locator = page.locator(item.target).first()
       const style = await locator.evaluate((el) => {
@@ -36,24 +36,34 @@ export const runCcaContrast = async (page: Page, url: string, incompleteItems: A
       const fg = parseCssColor(style.color)
       if (!fg) continue
 
-      // Hide the text (and its shadow) so the screenshot is pure background.
-      await locator.evaluate((el) => {
-        const h = el as HTMLElement
-        h.dataset.a11yPrevStyle = h.getAttribute('style') ?? ''
-        h.style.setProperty('color', 'transparent', 'important')
-        h.style.setProperty('text-shadow', 'none', 'important')
-      })
-      const shot = await locator.screenshot({ timeout: 3000 })
-      await locator.evaluate((el) => {
-        const h = el as HTMLElement
-        const prev = h.dataset.a11yPrevStyle ?? ''
-        if (prev) h.setAttribute('style', prev)
-        else h.removeAttribute('style')
-        delete h.dataset.a11yPrevStyle
-      })
+      const renderedShot = await locator.screenshot({ timeout: 3000, animations: 'disabled' })
 
-      const decoded = PNG.sync.read(shot)
-      const worst = worstCaseContrast(fg, decoded.data)
+      // Mask all rendered glyphs, including child and pseudo-element text, so
+      // foreground pixels cannot be mistaken for the sampled background.
+      const maskId = `cca-${itemIndex}`
+      await locator.evaluate((el, id) => el.setAttribute('data-a11y-cca-mask', id), maskId)
+      const scope = `[data-a11y-cca-mask="${maskId}"]`
+      const maskStyle = await page.addStyleTag({
+        content: `${scope}, ${scope} *, ${scope}::before, ${scope}::after, ${scope} *::before, ${scope} *::after {
+          color: transparent !important;
+          -webkit-text-fill-color: transparent !important;
+          text-shadow: none !important;
+          caret-color: transparent !important;
+        }`,
+      })
+      let shot: Buffer
+      try {
+        shot = await locator.screenshot({ timeout: 3000, animations: 'disabled' })
+      } finally {
+        await locator.evaluate((el) => el.removeAttribute('data-a11y-cca-mask')).catch(() => {})
+        await maskStyle.evaluate((el) => el.parentNode?.removeChild(el)).catch(() => {})
+      }
+
+      const rendered = PNG.sync.read(renderedShot)
+      const background = PNG.sync.read(shot)
+      if (rendered.width !== background.width || rendered.height !== background.height) continue
+      const textBackground = pixelsUnderRenderedText(background.data, rendered.data)
+      const worst = worstCaseContrast(fg, textBackground)
       if (Number.isNaN(worst.minRatio)) continue
 
       const required = requiredRatio(style.fontSize, style.fontWeight)

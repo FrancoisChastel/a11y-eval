@@ -75,7 +75,10 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
   const evidence: EvidencePacket[] = []
   let urls = options.urls
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      ...(options.storageStatePath ? { storageState: options.storageStatePath } : {}),
+    })
 
     if (options.crawl) {
       urls = await discoverPages(context, options.urls, {
@@ -104,7 +107,11 @@ export const evaluate = async (options: EvaluateOptions): Promise<Report> => {
           }
         }
         const keyboardFindings = await runKeyboardChecks(page, url, options.focusSampleSize)
-        const targetSizeFindings = await runTargetSizeCheck(page, url)
+        const targetSizeFindings = await runTargetSizeCheck(
+          page,
+          url,
+          axeResult.findings.filter((finding) => finding.ruleId === 'target-size').flatMap((finding) => finding.targets),
+        )
         const contentResult = await runContentChecks(page, url)
         const hoverFindings = await runHoverProbe(page, url)
         const interactFindings = options.interact ? await runInteractProbes(page, url) : []

@@ -7,6 +7,7 @@ import {
   normalizePageLang,
   type TargetBox,
 } from '../src/checks.ts'
+import { composeNarration } from '../src/engines/screenReader.ts'
 
 const box = (over: Partial<TargetBox>): TargetBox => ({
   selector: 'a',
@@ -70,6 +71,14 @@ describe('findOrderJumps (2.4.3)', () => {
     ])
     expect(jumps).toEqual([])
   })
+
+  test('ignores upward differences smaller than one target-size row', () => {
+    const jumps = findOrderJumps([
+      { selector: '#lower-edge', x: 0, y: 100, height: 20 },
+      { selector: '#slightly-higher', x: 200, y: 68, height: 20 },
+    ])
+    expect(jumps).toEqual([])
+  })
 })
 
 describe('findSensoryPhrases (1.3.3)', () => {
@@ -97,8 +106,7 @@ describe('normalizePageLang (3.1.2)', () => {
 })
 
 describe('composeNarration (screen-reader simulation)', () => {
-  test('speaks roles, names, heading levels, states, and flags unnamed controls', async () => {
-    const { composeNarration } = await import('../src/engines/screenReader.ts')
+  test('speaks roles, names, heading levels, states, and flags unnamed controls', () => {
     const phrases = composeNarration([
       { nodeId: '1', ignored: false, role: { value: 'RootWebArea' }, name: { value: 'Page' }, childIds: ['2', '3', '4', '5', '6'] },
       { nodeId: '2', ignored: false, role: { value: 'heading' }, name: { value: 'Billing' }, properties: [{ name: 'level', value: { value: 2 } }] },

@@ -9,8 +9,8 @@ import type { Finding } from '../types.ts'
  * exceptions, and emits suspects for what remains. Suspects, not violations:
  * the "equivalent control elsewhere" exception cannot be ruled out mechanically.
  */
-export const runTargetSizeCheck = async (page: Page, url: string): Promise<Finding[]> => {
-  const boxes = await page.evaluate((): TargetBox[] => {
+export const runTargetSizeCheck = async (page: Page, url: string, definitiveTargets: string[] = []): Promise<Finding[]> => {
+  const { boxes, definitiveSelectors } = await page.evaluate((axeTargets): { boxes: TargetBox[]; definitiveSelectors: string[] } => {
     const cssPath = (el: Element): string => {
       const parts: string[] = []
       let node: Element | null = el
@@ -57,7 +57,8 @@ export const runTargetSizeCheck = async (page: Page, url: string): Promise<Findi
       ),
     ).filter(isVisible)
 
-    return candidates.map((el) => {
+    const definitive = new Set<string>()
+    const boxes = candidates.map((el) => {
       // The effective target of a labeled control is the union with its label.
       const label = el.matches('input, select, textarea') ? labelFor(el) : null
       let rect = el.getBoundingClientRect()
@@ -72,8 +73,20 @@ export const runTargetSizeCheck = async (page: Page, url: string): Promise<Findi
       const hasTextSiblings = parent
         ? Array.from(parent.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim().length > 0)
         : false
+      const selector = cssPath(el)
+      if (
+        axeTargets.some((axeTarget) => {
+          try {
+            return el.matches(axeTarget)
+          } catch {
+            return false
+          }
+        })
+      ) {
+        definitive.add(selector)
+      }
       return {
-        selector: cssPath(el),
+        selector,
         x: rect.x,
         y: rect.y,
         width: rect.width,
@@ -81,9 +94,11 @@ export const runTargetSizeCheck = async (page: Page, url: string): Promise<Findi
         inline: display.startsWith('inline') && hasTextSiblings,
       }
     })
-  })
+    return { boxes, definitiveSelectors: [...definitive] }
+  }, definitiveTargets)
 
-  return analyzeTargetSizes(boxes).map((suspect) => ({
+  const definitive = new Set(definitiveSelectors)
+  return analyzeTargetSizes(boxes).filter((suspect) => !definitive.has(suspect.selector)).map((suspect) => ({
     engine: 'keyboard' as const,
     ruleId: 'target-size-suspect',
     impact: 'moderate' as const,

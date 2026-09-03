@@ -5,8 +5,13 @@ const DEFAULT_FOCUS_SAMPLE = 25
 
 interface ElementProbe {
   selector: string
-  keyboardOperable: boolean
-  focusIndistinct: boolean
+  keyboardUnreachable: boolean
+}
+
+interface FocusCandidate {
+  id: string
+  selector: string
+  blurred: string
 }
 
 /**
@@ -18,7 +23,7 @@ interface ElementProbe {
 export const runKeyboardChecks = async (page: Page, url: string, focusSampleSize = DEFAULT_FOCUS_SAMPLE): Promise<Finding[]> => {
   const findings: Finding[] = []
 
-  const probes = await page.evaluate((sampleSize) => {
+  const pageProbes = await page.evaluate(() => {
     const cssPath = (el: Element): string => {
       const parts: string[] = []
       let node: Element | null = el
@@ -50,37 +55,51 @@ export const runKeyboardChecks = async (page: Page, url: string, focusSampleSize
     const NATIVE_FOCUSABLE = 'a[href], button, input, select, textarea, summary, [contenteditable="true"]'
     const candidates = Array.from(
       document.querySelectorAll<HTMLElement>(`${NATIVE_FOCUSABLE}, [onclick], [role="button"], [role="link"], [tabindex]`),
-    ).filter(isVisible)
+    ).filter(
+      (el) =>
+        isVisible(el) &&
+        !el.matches(':disabled') &&
+        el.getAttribute('aria-disabled') !== 'true' &&
+        !el.closest('[aria-hidden="true"]'),
+    )
 
     const focusSignature = (el: HTMLElement): string => {
       const s = getComputedStyle(el)
       return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.backgroundColor, s.textDecorationLine].join('|')
     }
 
-    const results: { selector: string; keyboardOperable: boolean; focusIndistinct: boolean }[] = []
-    let focusTested = 0
-    for (const el of candidates) {
-      const nativelyFocusable = el.matches(NATIVE_FOCUSABLE) && !el.hasAttribute('disabled')
-      const tabindex = el.getAttribute('tabindex')
-      const keyboardFocusable = nativelyFocusable || (tabindex !== null && Number(tabindex) >= 0)
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
 
-      let focusIndistinct = false
-      if (keyboardFocusable && focusTested < sampleSize) {
-        focusTested += 1
-        const blurred = focusSignature(el)
-        el.focus({ preventScroll: true })
-        const focused = focusSignature(el)
-        el.blur()
-        focusIndistinct = blurred === focused
+    const elements: ElementProbe[] = []
+    const focusCandidates: FocusCandidate[] = []
+    for (const [index, el] of candidates.entries()) {
+      const tabindex = el.getAttribute('tabindex')
+      const removedFromTabOrder = tabindex !== null && Number(tabindex) < 0
+      const nativelyFocusable = el.matches(NATIVE_FOCUSABLE) && !removedFromTabOrder
+      const keyboardFocusable = nativelyFocusable || (tabindex !== null && Number(tabindex) >= 0)
+      const hasClickAffordance = el.matches(`${NATIVE_FOCUSABLE}, [onclick], [role="button"], [role="link"]`)
+      const managedCompositeItem =
+        removedFromTabOrder &&
+        el.matches(
+          '[role="tab"], [role="option"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="treeitem"], [role="gridcell"], [role="row"]',
+        )
+
+      if (keyboardFocusable) {
+        const id = String(index)
+        el.setAttribute('data-a11y-focus-probe', id)
+        focusCandidates.push({ id, selector: cssPath(el), blurred: focusSignature(el) })
       }
 
-      results.push({ selector: cssPath(el), keyboardOperable: keyboardFocusable, focusIndistinct })
+      elements.push({
+        selector: cssPath(el),
+        keyboardUnreachable: hasClickAffordance && !keyboardFocusable && !managedCompositeItem,
+      })
     }
-    return results
-  }, focusSampleSize)
+    return { elements, focusCandidates }
+  })
 
-  for (const probe of probes as ElementProbe[]) {
-    if (!probe.keyboardOperable) {
+  for (const probe of pageProbes.elements) {
+    if (probe.keyboardUnreachable) {
       findings.push({
         engine: 'keyboard',
         ruleId: 'keyboard-unreachable',
@@ -90,7 +109,30 @@ export const runKeyboardChecks = async (page: Page, url: string, focusSampleSize
         page: url,
         targets: [probe.selector],
       })
-    } else if (probe.focusIndistinct) {
+    }
+  }
+
+  const candidateById = new Map(pageProbes.focusCandidates.map((candidate) => [candidate.id, candidate]))
+  const tested = new Set<string>()
+  const maxTabPresses = Math.min(Math.max(pageProbes.focusCandidates.length * 2, focusSampleSize * 2), 200)
+  try {
+    for (let press = 0; press < maxTabPresses && tested.size < focusSampleSize; press += 1) {
+      await page.keyboard.press('Tab')
+      const focused = await page.evaluate(() => {
+        const el = document.activeElement
+        if (!(el instanceof HTMLElement)) return null
+        const id = el.getAttribute('data-a11y-focus-probe')
+        if (id === null) return null
+        const s = getComputedStyle(el)
+        const signature = [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.backgroundColor, s.textDecorationLine].join('|')
+        return { id, signature }
+      })
+      if (!focused) continue
+      if (tested.has(focused.id)) break
+      tested.add(focused.id)
+      const candidate = candidateById.get(focused.id)
+      if (!candidate || candidate.blurred !== focused.signature) continue
+
       findings.push({
         engine: 'keyboard',
         ruleId: 'focus-not-visible',
@@ -98,9 +140,14 @@ export const runKeyboardChecks = async (page: Page, url: string, focusSampleSize
         wcag: ['2.4.7'],
         description: 'Focused state is visually identical to the unfocused state — no visible focus indicator.',
         page: url,
-        targets: [probe.selector],
+        targets: [candidate.selector],
       })
     }
+  } finally {
+    await page.evaluate(() => {
+      document.querySelectorAll('[data-a11y-focus-probe]').forEach((el) => el.removeAttribute('data-a11y-focus-probe'))
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    })
   }
 
   const originalViewport = page.viewportSize()

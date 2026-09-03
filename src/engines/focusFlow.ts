@@ -58,6 +58,19 @@ export const runFocusFlowChecks = async (page: Page, url: string): Promise<Focus
           const els = Array.from(document.querySelectorAll<HTMLElement>(selector))
           const el = els[index]
           if (!el) return null
+          const style = getComputedStyle(el)
+          const rect = el.getBoundingClientRect()
+          if (
+            el.matches(':disabled') ||
+            el.getAttribute('aria-disabled') === 'true' ||
+            el.closest('[aria-hidden="true"]') ||
+            rect.width === 0 ||
+            rect.height === 0 ||
+            style.visibility === 'hidden' ||
+            style.display === 'none'
+          ) {
+            return null
+          }
           const before = dialogCount()
           el.focus({ preventScroll: true })
           const after = dialogCount()
@@ -135,6 +148,7 @@ export const runFocusFlowChecks = async (page: Page, url: string): Promise<Focus
       return { selector: part, x: Math.round(rect.x), y: Math.round(rect.y + scrollY), height: Math.round(rect.height), multiSegment }
     })
     if (!stop) break
+    if (stops.length > 1 && stops[0].selector === stop.selector && stops[0].y === stop.y && stops[0].x === stop.x) break
     const prev = stops[stops.length - 1]
     if (prev && prev.selector === stop.selector && prev.y === stop.y && prev.x === stop.x) {
       repeats += 1
@@ -143,7 +157,6 @@ export const runFocusFlowChecks = async (page: Page, url: string): Promise<Focus
       repeats = 0
       stops.push(stop)
     }
-    if (stops.length > 1 && stops[0].selector === stop.selector && stops[0].y === stop.y && stops[0].x === stop.x) break // full cycle
   }
 
   if (stuckAt) {

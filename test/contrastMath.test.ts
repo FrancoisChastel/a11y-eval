@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'vitest'
-import { composite, contrastRatio, judgeContrast, parseCssColor, requiredRatio, worstCaseContrast } from '../src/contrastMath.ts'
+import {
+  composite,
+  contrastRatio,
+  judgeContrast,
+  parseCssColor,
+  pixelsUnderRenderedText,
+  requiredRatio,
+  worstCaseContrast,
+} from '../src/contrastMath.ts'
 
 const rgb = (r: number, g: number, b: number, a = 1) => ({ r, g, b, a })
 
@@ -46,6 +54,23 @@ describe('contrast math', () => {
     const withAlpha = worstCaseContrast(rgb(0, 0, 0, 0.5), white)
     expect(withAlpha.minRatio).toBeLessThan(6)
     expect(composite(rgb(0, 0, 0, 0.5), rgb(255, 255, 255)).r).toBeCloseTo(127.5, 1)
+  })
+
+  test('samples only background pixels beneath rendered text', () => {
+    const background = pixels([
+      [255, 255, 255, 255],
+      [0, 90, 158, 255],
+    ])
+    const rendered = pixels([
+      [255, 255, 255, 255],
+      [255, 255, 255, 255],
+    ])
+    const sampled = pixelsUnderRenderedText(background, rendered)
+    const worst = worstCaseContrast(rgb(255, 255, 255), sampled)
+
+    expect(sampled[3]).toBe(0)
+    expect(worst.samples).toBe(1)
+    expect(worst.minRatio).toBeGreaterThan(6)
   })
 
   test('judgeContrast: fail/pass with a borderline epsilon band', () => {

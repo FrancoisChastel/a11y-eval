@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { buildAdjudicationPrompt, parseAdjudication, resolveBackend } from '../src/engines/adjudicate.ts'
+import { extractJson } from '../src/engines/vlm.ts'
 import { COVERAGE_NOTE, MANUAL_CHECKLIST } from '../src/wcag.ts'
 import type { Report } from '../src/types.ts'
 
@@ -103,8 +104,7 @@ describe('parseAdjudication', () => {
 })
 
 describe('extractJson (vlm parsing)', () => {
-  test('extracts objects and arrays from prose-wrapped responses', async () => {
-    const { extractJson } = await import('../src/engines/vlm.ts')
+  test('extracts objects and arrays from prose-wrapped responses', () => {
     expect(extractJson('Sure! {"colorOnlyMeaning": true, "where": "badges"}')).toEqual({ colorOnlyMeaning: true, where: 'badges' })
     expect(extractJson('Result:\n[{"index":0,"adequate":false}]\nDone.')).toEqual([{ index: 0, adequate: false }])
     expect(extractJson('I cannot analyze this.')).toBeNull()
